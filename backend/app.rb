@@ -15,22 +15,17 @@ set :bind, '0.0.0.0'
 set :port, 4567
 set :server, "webrick"
 
-DB_PATH = File.join(__dir__, "db.sqlite3")
-puts "#{DB_PATH} exists=#{File.exist?(DB_PATH)}"
+DB_PATH = File.expand_path(File.join(__dir__, "db.sqlite3"))
+DB = Sequel.connect("sqlite://#{DB_PATH}")
 
-unless File.writable?(File.dirname(DB_PATH))
-  puts "ERROR: Directory #{File.dirname(DB_PATH)} is not writable"
+begin
+  DB.run("PRAGMA journal_mode=WAL")
+rescue => e
+  puts "#{e.class} #{e.message}"
   exit 1
 end
 
-if File.exist?(DB_PATH) && !File.writable?(DB_PATH)
-  puts "ERROR: Database file #{DB_PATH} is not writable"
-  exit 1
-end
-
-DB = Sequel.sqlite(DB_PATH)
-
-unless DB.table_exists?(:measurements)
+if !DB.table_exists?(:measurements)
   DB.create_table :measurements do
     primary_key :id
     Integer :plant_id, null: false
@@ -41,6 +36,22 @@ unless DB.table_exists?(:measurements)
     Integer :light_lux, null: false
     String :created_at, null: false
   end
+end
+
+begin
+  DB[:measurements].insert(
+    plant_id: 0,
+    measured_at: Time.now.utc.iso8601,
+    soil_moisture: 0,
+    air_temp_c: 0.0,
+    air_humidity: 0.0,
+    light_lux: 0,
+    created_at: Time.now.utc.iso8601
+  )
+rescue Sequel::UniqueConstraintViolation
+rescue => e
+  puts "#{e.class} #{e.message}"
+  exit 1
 end
 
 def validate_measurement(data)
