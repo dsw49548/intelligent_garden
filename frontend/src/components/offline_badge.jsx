@@ -21,18 +21,9 @@ function OfflineBadge() {
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: '10px',
-      right: '10px',
-      background: '#ff9800',
-      color: 'white',
-      padding: '0.5rem 1rem',
-      borderRadius: '4px',
-      zIndex: 1000
-    }}>
+    <span className="badge badge_offline" style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
       Offline
-    </div>
+    </span>
   )
 }
 

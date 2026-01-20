@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
 import { fetchMeasurements } from '../api.js'
-import { getLastMeasurements } from '../storage.js'
+import { getLastMeasurements, getSelectedPlantId } from '../storage.js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
@@ -12,13 +12,14 @@ function History() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    const selectedId = getSelectedPlantId()
     const cached = getLastMeasurements()
     if (cached.history) {
       setMeasurements(cached.history)
       setLoading(false)
     }
 
-    fetchMeasurements(1, 50)
+    fetchMeasurements(selectedId, 50)
       .then(data => {
         setMeasurements(data)
         const cached = getLastMeasurements()
@@ -37,19 +38,53 @@ function History() {
       })
   }, [])
 
+  const formatDate = (dateString) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    return date.toLocaleString('pl-PL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
+
   if (loading) {
-    return <div>Loading...</div>
+    return (
+      <div className="card">
+        <div className="empty_state">
+          <p>Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   if (error && measurements.length === 0) {
-    return <div>Error: {error}</div>
+    return (
+      <div className="card">
+        <div className="empty_state">
+          <p>Error: {error}</p>
+        </div>
+      </div>
+    )
   }
 
   if (measurements.length === 0) {
-    return <div>No measurements</div>
+    return (
+      <div className="card">
+        <div className="empty_state">
+          <p>No measurements available</p>
+        </div>
+      </div>
+    )
   }
 
-  const labels = measurements.map(m => new Date(m.measured_at).toLocaleString())
+  const labels = measurements.map(m => {
+    const date = new Date(m.measured_at)
+    return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
+  })
   const soilData = measurements.map(m => m.soil_moisture)
   const tempData = measurements.map(m => m.air_temp_c)
   const humidityData = measurements.map(m => m.air_humidity)
@@ -63,50 +98,102 @@ function History() {
         data: soilData,
         borderColor: 'rgb(75, 192, 192)',
         backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        tension: 0.4,
       },
       {
         label: 'Temperature (°C)',
         data: tempData,
         borderColor: 'rgb(255, 99, 132)',
         backgroundColor: 'rgba(255, 99, 132, 0.2)',
+        tension: 0.4,
       },
       {
         label: 'Humidity (%)',
         data: humidityData,
         borderColor: 'rgb(54, 162, 235)',
         backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        tension: 0.4,
       },
       {
         label: 'Light (lux)',
         data: lightData,
         borderColor: 'rgb(255, 206, 86)',
         backgroundColor: 'rgba(255, 206, 86, 0.2)',
+        tension: 0.4,
       }
     ]
   }
 
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          font: {
+            size: 11
+          },
+          padding: 8,
+          usePointStyle: true,
+        }
+      },
+      title: {
+        display: false
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          font: {
+            size: 10
+          },
+          maxTicksLimit: 6
+        },
+        grid: {
+          color: '#2a2a2a'
+        }
+      },
+      y: {
+        ticks: {
+          font: {
+            size: 10
+          }
+        },
+        grid: {
+          color: '#2a2a2a'
+        }
+      }
+    }
+  }
+
   return (
-    <div>
-      <h1>History</h1>
-      {error && <div style={{ color: 'orange' }}>Using cached data</div>}
-      <div style={{ height: '400px', marginTop: '2rem' }}>
-        <Line data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
+    <>
+      <div className="card">
+        {error && (
+          <div className="badge badge_offline" style={{ marginBottom: '1rem' }}>
+            Using cached data
+          </div>
+        )}
+        <div className="card_title">Measurement History</div>
+        <div className="chart_container">
+          <Line data={chartData} options={chartOptions} />
+        </div>
       </div>
-      <div style={{ marginTop: '2rem' }}>
-        <h2>Recent Measurements</h2>
-        <ul>
+      <div className="card">
+        <div className="card_title">Recent Measurements</div>
+        <ul className="measurement_list">
           {measurements.slice(0, 10).map(m => (
-            <li key={m.id}>
-              {new Date(m.measured_at).toLocaleString()} - 
-              Soil: {m.soil_moisture}%, 
-              Temp: {m.air_temp_c}°C, 
-              Humidity: {m.air_humidity}%, 
-              Light: {m.light_lux} lux
+            <li key={m.id} className="measurement_item">
+              <span className="measurement_timestamp">{formatDate(m.measured_at)}</span>
+              <span className="measurement_values">
+                Soil: {m.soil_moisture}% | Temp: {m.air_temp_c}°C
+              </span>
             </li>
           ))}
         </ul>
       </div>
-    </div>
+    </>
   )
 }
 

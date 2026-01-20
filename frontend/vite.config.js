@@ -11,7 +11,7 @@ export default defineConfig({
         name: 'Intelligent Garden',
         short_name: 'Garden',
         description: 'Plant monitoring PWA',
-        theme_color: '#ffffff',
+        theme_color: '#0b0f14',
         icons: [
           {
             src: 'pwa-192.png',

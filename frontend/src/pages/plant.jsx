@@ -26,24 +26,71 @@ function Plant() {
       })
   }, [id])
 
+  const formatDate = (dateString) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    return date.toLocaleString('pl-PL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
+
   if (loading) {
-    return <div>Loading...</div>
+    return (
+      <div className="card">
+        <div className="empty_state">
+          <p>Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div>
-      <h1>{plant ? plant.name : `Plant ${id}`}</h1>
+    <div className="card">
       {plant && plant.photo && (
-        <img src={plant.photo} alt={plant.name} style={{ maxWidth: '300px', marginBottom: '1rem' }} />
+        <img src={plant.photo} alt={plant.name} className="plant_image" />
       )}
-      {measurement && (
-        <div>
-          <h2>Latest Measurement</h2>
-          <p>Soil Moisture: {measurement.soil_moisture}%</p>
-          <p>Temperature: {measurement.air_temp_c}°C</p>
-          <p>Humidity: {measurement.air_humidity}%</p>
-          <p>Light: {measurement.light_lux} lux</p>
-          <p>Measured At: {new Date(measurement.measured_at).toLocaleString()}</p>
+      <div className="card_title">{plant ? plant.name : `Plant ${id}`}</div>
+      {plant && plant.species && (
+        <div className="card_subtitle">{plant.species}</div>
+      )}
+      {measurement ? (
+        <>
+          <div className="row">
+            <div className="kv">
+              <span className="kv_label">Soil Moisture</span>
+              <span className="kv_value">{measurement.soil_moisture}%</span>
+            </div>
+          </div>
+          <div className="row">
+            <div className="kv">
+              <span className="kv_label">Temperature</span>
+              <span className="kv_value">{measurement.air_temp_c}°C</span>
+            </div>
+          </div>
+          <div className="row">
+            <div className="kv">
+              <span className="kv_label">Humidity</span>
+              <span className="kv_value">{measurement.air_humidity}%</span>
+            </div>
+          </div>
+          <div className="row">
+            <div className="kv">
+              <span className="kv_label">Light</span>
+              <span className="kv_value">{measurement.light_lux} lux</span>
+            </div>
+          </div>
+          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #2a2a2a', color: '#aaa', fontSize: '0.85rem' }}>
+            Measured At: {formatDate(measurement.measured_at)}
+          </div>
+        </>
+      ) : (
+        <div className="empty_state" style={{ padding: '1rem' }}>
+          <p>No measurement data available</p>
         </div>
       )}
     </div>

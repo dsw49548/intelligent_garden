@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getPlants, addPlant, savePlants } from '../storage.js'
+import { getPlants, addPlant, setSelectedPlantId } from '../storage.js'
 
 function Settings() {
   const [plants, setPlants] = useState([])
@@ -45,14 +45,20 @@ function Settings() {
     }
   }
 
+  const handleSelectPlant = (id) => {
+    setSelectedPlantId(id.toString())
+    alert('Plant selected')
+  }
+
   return (
-    <div>
-      <h1>Settings</h1>
-      <div>
-        <h2>Add Plant</h2>
+    <>
+      <div className="card">
+        <div className="card_title">Add Plant</div>
+        <label className="label">Plant Name</label>
         <input
           type="text"
-          placeholder="Plant name"
+          className="input"
+          placeholder="Enter plant name"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -63,22 +69,47 @@ function Settings() {
           style={{ display: 'none' }}
           onChange={handlePhotoChange}
         />
-        <button onClick={handleCameraClick}>Take Photo</button>
-        {photo && <img src={photo} alt="Plant" style={{ maxWidth: '200px', marginTop: '1rem' }} />}
-        <button onClick={handleAddPlant} style={{ marginTop: '1rem', display: 'block' }}>Add Plant</button>
+        <button className="btn_primary" onClick={handleCameraClick} style={{ marginTop: 0 }}>
+          Take Photo
+        </button>
+        {photo && (
+          <img src={photo} alt="Preview" className="plant_image" style={{ marginTop: '1rem' }} />
+        )}
+        <button className="btn_primary" onClick={handleAddPlant} disabled={!name.trim()}>
+          Add Plant
+        </button>
       </div>
-      <div style={{ marginTop: '2rem' }}>
-        <h2>Plants</h2>
-        <ul>
-          {plants.map(plant => (
-            <li key={plant.id}>
-              {plant.name}
-              {plant.photo && <img src={plant.photo} alt={plant.name} style={{ maxWidth: '100px', marginLeft: '1rem' }} />}
-            </li>
-          ))}
-        </ul>
+      <div className="card">
+        <div className="card_title">My Plants</div>
+        {plants.length === 0 ? (
+          <div className="empty_state" style={{ padding: '1rem' }}>
+            <p>No plants added yet</p>
+          </div>
+        ) : (
+          <div>
+            {plants.map(plant => (
+              <div key={plant.id} className="plant_mini">
+                {plant.photo ? (
+                  <img src={plant.photo} alt={plant.name} className="plant_mini_img" />
+                ) : (
+                  <div className="plant_mini_img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+                    📷
+                  </div>
+                )}
+                <div className="plant_mini_info">
+                  <div className="plant_mini_name">{plant.name}</div>
+                </div>
+                <div className="plant_mini_actions">
+                  <button className="btn_small btn_secondary" onClick={() => handleSelectPlant(plant.id)}>
+                    Select
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </>
   )
 }
 
