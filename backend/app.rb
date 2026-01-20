@@ -2,6 +2,14 @@ require 'sinatra'
 require 'json'
 require 'sequel'
 require 'time'
+require 'rack/cors'
+
+use Rack::Cors do
+  allow do
+    origins 'http://localhost:5173'
+    resource '/api/*', headers: 'Content-Type', methods: [:get, :post, :options]
+  end
+end
 
 set :bind, '0.0.0.0'
 set :port, 4567
