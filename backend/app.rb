@@ -128,3 +128,38 @@ get '/api/measurements/latest' do
     created_at: record[:created_at]
   }.to_json
 end
+
+get '/api/measurements' do
+  content_type :json
+  
+  plant_id = params['plant_id']
+  unless plant_id && plant_id.to_i > 0
+    status 400
+    return { error: 'missing or invalid plant_id' }.to_json
+  end
+
+  limit = params['limit'] ? params['limit'].to_i : 100
+  if limit < 1 || limit > 500
+    status 400
+    return { error: 'limit out of range (1-500)' }.to_json
+  end
+
+  records = DB[:measurements]
+    .where(plant_id: plant_id.to_i)
+    .order(Sequel.desc(:measured_at))
+    .limit(limit)
+    .map do |record|
+      {
+        id: record[:id],
+        plant_id: record[:plant_id],
+        measured_at: record[:measured_at],
+        soil_moisture: record[:soil_moisture],
+        air_temp_c: record[:air_temp_c],
+        air_humidity: record[:air_humidity],
+        light_lux: record[:light_lux],
+        created_at: record[:created_at]
+      }
+    end
+
+  records.to_json
+end
