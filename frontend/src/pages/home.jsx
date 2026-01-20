@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchLatestMeasurement } from '../api.js'
+import { getLastMeasurements, saveLastMeasurements } from '../storage.js'
 
 function Home() {
   const [measurement, setMeasurement] = useState(null)
@@ -7,14 +8,28 @@ function Home() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    const cached = getLastMeasurements()
+    if (cached['1']) {
+      setMeasurement(cached['1'])
+      setLoading(false)
+    }
+
     fetchLatestMeasurement(1)
       .then(data => {
         setMeasurement(data)
+        const cached = getLastMeasurements()
+        cached['1'] = data
+        saveLastMeasurements(cached)
         setLoading(false)
       })
       .catch(err => {
         setError(err.message)
         setLoading(false)
+        const cached = getLastMeasurements()
+        if (cached['1']) {
+          setMeasurement(cached['1'])
+          setError(null)
+        }
       })
   }, [])
 
@@ -22,7 +37,7 @@ function Home() {
     return <div>Loading...</div>
   }
 
-  if (error) {
+  if (error && !measurement) {
     return <div>Error: {error}</div>
   }
 
@@ -33,6 +48,7 @@ function Home() {
   return (
     <div>
       <h1>Dashboard</h1>
+      {error && <div style={{ color: 'orange' }}>Using cached data</div>}
       <div>
         <h2>Latest Measurement</h2>
         <p>Plant ID: {measurement.plant_id}</p>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
 import { fetchMeasurements } from '../api.js'
+import { getLastMeasurements } from '../storage.js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
@@ -11,14 +12,28 @@ function History() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    const cached = getLastMeasurements()
+    if (cached.history) {
+      setMeasurements(cached.history)
+      setLoading(false)
+    }
+
     fetchMeasurements(1, 50)
       .then(data => {
         setMeasurements(data)
+        const cached = getLastMeasurements()
+        cached.history = data
+        localStorage.setItem('last_measurements', JSON.stringify(cached))
         setLoading(false)
       })
       .catch(err => {
         setError(err.message)
         setLoading(false)
+        const cached = getLastMeasurements()
+        if (cached.history) {
+          setMeasurements(cached.history)
+          setError(null)
+        }
       })
   }, [])
 
@@ -26,7 +41,7 @@ function History() {
     return <div>Loading...</div>
   }
 
-  if (error) {
+  if (error && measurements.length === 0) {
     return <div>Error: {error}</div>
   }
 
@@ -73,6 +88,7 @@ function History() {
   return (
     <div>
       <h1>History</h1>
+      {error && <div style={{ color: 'orange' }}>Using cached data</div>}
       <div style={{ height: '400px', marginTop: '2rem' }}>
         <Line data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
       </div>
