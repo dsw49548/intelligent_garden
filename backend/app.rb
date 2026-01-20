@@ -96,3 +96,35 @@ post '/api/measurements' do
     created_at: record[:created_at]
   }.to_json
 end
+
+get '/api/measurements/latest' do
+  content_type :json
+  
+  plant_id = params['plant_id']
+  unless plant_id && plant_id.to_i > 0
+    status 400
+    return { error: 'missing or invalid plant_id' }.to_json
+  end
+
+  record = DB[:measurements]
+    .where(plant_id: plant_id.to_i)
+    .order(Sequel.desc(:measured_at))
+    .limit(1)
+    .first
+
+  if record.nil?
+    status 404
+    return { error: 'not found' }.to_json
+  end
+
+  {
+    id: record[:id],
+    plant_id: record[:plant_id],
+    measured_at: record[:measured_at],
+    soil_moisture: record[:soil_moisture],
+    air_temp_c: record[:air_temp_c],
+    air_humidity: record[:air_humidity],
+    light_lux: record[:light_lux],
+    created_at: record[:created_at]
+  }.to_json
+end
