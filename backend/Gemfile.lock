@@ -38,6 +38,7 @@ GEM
     sqlite3 (2.9.0-x86_64-linux-gnu)
     sqlite3 (2.9.0-x86_64-linux-musl)
     tilt (2.7.0)
+    webrick (1.9.2)
 
 PLATFORMS
   aarch64-linux-gnu
@@ -56,6 +57,7 @@ DEPENDENCIES
   sequel
   sinatra
   sqlite3
+  webrick
 
 BUNDLED WITH
    2.6.9

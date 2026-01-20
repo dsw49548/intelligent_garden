@@ -13,8 +13,22 @@ end
 
 set :bind, '0.0.0.0'
 set :port, 4567
+set :server, "webrick"
 
-DB = Sequel.sqlite('db.sqlite3')
+DB_PATH = File.join(__dir__, "db.sqlite3")
+puts "#{DB_PATH} exists=#{File.exist?(DB_PATH)}"
+
+unless File.writable?(File.dirname(DB_PATH))
+  puts "ERROR: Directory #{File.dirname(DB_PATH)} is not writable"
+  exit 1
+end
+
+if File.exist?(DB_PATH) && !File.writable?(DB_PATH)
+  puts "ERROR: Database file #{DB_PATH} is not writable"
+  exit 1
+end
+
+DB = Sequel.sqlite(DB_PATH)
 
 unless DB.table_exists?(:measurements)
   DB.create_table :measurements do
