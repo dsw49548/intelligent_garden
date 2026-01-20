@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
 import { fetchMeasurements } from '../api.js'
-import { getLastMeasurements, getSelectedPlantId } from '../storage.js'
+import { getLastMeasurements, getSelectedPlantId, getPlants } from '../storage.js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
@@ -10,8 +10,17 @@ function History() {
   const [measurements, setMeasurements] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [plants, setPlants] = useState([])
 
   useEffect(() => {
+    const allPlants = getPlants()
+    setPlants(allPlants)
+    
+    if (allPlants.length === 0) {
+      setLoading(false)
+      return
+    }
+
     const selectedId = getSelectedPlantId()
     const cached = getLastMeasurements()
     if (cached.history) {
@@ -21,10 +30,12 @@ function History() {
 
     fetchMeasurements(selectedId, 50)
       .then(data => {
-        setMeasurements(data)
-        const cached = getLastMeasurements()
-        cached.history = data
-        localStorage.setItem('last_measurements', JSON.stringify(cached))
+        setMeasurements(data || [])
+        if (data && data.length > 0) {
+          const cached = getLastMeasurements()
+          cached.history = data
+          localStorage.setItem('last_measurements', JSON.stringify(cached))
+        }
         setLoading(false)
       })
       .catch(err => {
@@ -61,6 +72,17 @@ function History() {
     )
   }
 
+  if (plants.length === 0) {
+    return (
+      <div className="card">
+        <div className="empty_state">
+          <p>No plants added yet.</p>
+          <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Add one in Settings.</p>
+        </div>
+      </div>
+    )
+  }
+
   if (error && measurements.length === 0) {
     return (
       <div className="card">
@@ -75,7 +97,7 @@ function History() {
     return (
       <div className="card">
         <div className="empty_state">
-          <p>No measurements available</p>
+          <p>No measurement history available.</p>
         </div>
       </div>
     )

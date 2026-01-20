@@ -7,11 +7,19 @@ function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [plant, setPlant] = useState(null)
+  const [plants, setPlants] = useState([])
 
   useEffect(() => {
+    const allPlants = getPlants()
+    setPlants(allPlants)
+    
+    if (allPlants.length === 0) {
+      setLoading(false)
+      return
+    }
+
     const selectedId = getSelectedPlantId()
-    const plants = getPlants()
-    const foundPlant = plants.find(p => p.id.toString() === selectedId)
+    const foundPlant = allPlants.find(p => p.id.toString() === selectedId)
     if (foundPlant) {
       setPlant(foundPlant)
     }
@@ -25,9 +33,11 @@ function Home() {
     fetchLatestMeasurement(selectedId)
       .then(data => {
         setMeasurement(data)
-        const cached = getLastMeasurements()
-        cached[selectedId] = data
-        saveLastMeasurements(cached)
+        if (data) {
+          const cached = getLastMeasurements()
+          cached[selectedId] = data
+          saveLastMeasurements(cached)
+        }
         setLoading(false)
       })
       .catch(err => {
@@ -75,6 +85,17 @@ function Home() {
     )
   }
 
+  if (plants.length === 0) {
+    return (
+      <div className="card">
+        <div className="empty_state">
+          <p>No plants added yet.</p>
+          <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Add one in Settings.</p>
+        </div>
+      </div>
+    )
+  }
+
   if (error && !measurement) {
     return (
       <div className="card">
@@ -89,13 +110,12 @@ function Home() {
   }
 
   if (!measurement) {
+    const selectedId = getSelectedPlantId()
     return (
       <div className="card">
         <div className="empty_state">
-          <p>No data available</p>
-          <button className="btn_primary" onClick={() => window.location.reload()}>
-            Load Data
-          </button>
+          <p>No measurements available for this plant (plant_id={selectedId}).</p>
+          <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Run Fake IoT to generate data.</p>
         </div>
       </div>
     )

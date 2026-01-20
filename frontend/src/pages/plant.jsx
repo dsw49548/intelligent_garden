@@ -1,10 +1,11 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { fetchLatestMeasurement } from '../api.js'
-import { getPlants } from '../storage.js'
+import { getPlants, getActivePlantId } from '../storage.js'
 
 function Plant() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [measurement, setMeasurement] = useState(null)
   const [plant, setPlant] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -12,9 +13,18 @@ function Plant() {
   useEffect(() => {
     const plants = getPlants()
     const foundPlant = plants.find(p => p.id.toString() === id)
-    if (foundPlant) {
-      setPlant(foundPlant)
+
+    if (!foundPlant) {
+      const activeId = getActivePlantId()
+      if (activeId) {
+        navigate(`/plant/${activeId}`, { replace: true })
+      } else {
+        navigate('/', { replace: true })
+      }
+      return
     }
+
+    setPlant(foundPlant)
 
     fetchLatestMeasurement(id)
       .then(data => {
@@ -24,7 +34,7 @@ function Plant() {
       .catch(() => {
         setLoading(false)
       })
-  }, [id])
+  }, [id, navigate])
 
   const formatDate = (dateString) => {
     if (!dateString) return ''

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getPlants, addPlant, setSelectedPlantId } from '../storage.js'
+import { getPlants, addPlant, setSelectedPlantId, deletePlant } from '../storage.js'
 
 function Settings() {
   const [plants, setPlants] = useState([])
@@ -48,6 +48,13 @@ function Settings() {
   const handleSelectPlant = (id) => {
     setSelectedPlantId(id.toString())
     alert('Plant selected')
+  }
+
+  const handleDeletePlant = (id) => {
+    if (confirm('Are you sure you want to delete this plant?')) {
+      deletePlant(id)
+      setPlants(getPlants())
+    }
   }
 
   return (
@@ -102,6 +109,9 @@ function Settings() {
                 <div className="plant_mini_actions">
                   <button className="btn_small btn_secondary" onClick={() => handleSelectPlant(plant.id)}>
                     Select
+                  </button>
+                  <button className="btn_small btn_danger" onClick={() => handleDeletePlant(plant.id)}>
+                    Delete
                   </button>
                 </div>
               </div>

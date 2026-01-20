@@ -37,7 +37,7 @@ body {
 .content {
   flex: 1;
   padding: 1rem;
-  max-width: 520px;
+  max-width: 1000px;
   width: 100%;
   margin: 0 auto;
 }
@@ -202,10 +202,16 @@ body {
 }
 
 .chart_container {
-  height: 240px;
+  height: 300px;
   margin: 1rem 0;
   position: relative;
   overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .chart_container {
+    height: 340px;
+  }
 }
 
 .plant_mini {
@@ -325,5 +331,17 @@ body {
 @media (min-width: 768px) {
   .content {
     padding: 2rem;
+  }
+
+  .card {
+    padding: 2rem;
+  }
+
+  .card_title {
+    font-size: 1.75rem;
+  }
+
+  .kv_value {
+    font-size: 1.1rem;
   }
 }

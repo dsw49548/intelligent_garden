@@ -3,3 +3,8 @@
 *.pem
 secrets.*
 credentials.*
+node_modules/
+dist/
+build/
+.cache/
+coverage/
