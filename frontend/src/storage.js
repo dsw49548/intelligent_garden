@@ -51,17 +51,8 @@ export function getDefaultThresholds() {
 
 export function deletePlant(plantId) {
   const plants = getPlants()
-  const activeId = getActivePlantId()
-  const filtered = plants.filter(p => Number(p.id) !== Number(plantId))
+  const filtered = plants.filter(p => p.id !== plantId)
   savePlants(filtered)
-
-  if (Number(activeId) === Number(plantId)) {
-    if (filtered.length > 0) {
-      setActivePlantId(filtered[0].id)
-    } else {
-      setActivePlantId(null)
-    }
-  }
 }
 
 export function getActivePlantId() {

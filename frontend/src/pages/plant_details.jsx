@@ -4,6 +4,8 @@ import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
 import { getPlantById, getCachedLatest, saveCachedLatest, calculateStatus, getCachedHistory, saveCachedHistory } from '../storage.js'
 import { fetchLatestMeasurement, fetchMeasurements } from '../api.js'
+import BottomSheet from '../components/bottom_sheet.jsx'
+import PlantSettings from '../components/plant_settings.jsx'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
@@ -17,6 +19,7 @@ function PlantDetails() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [status, setStatus] = useState('NO DATA')
   const [limit, setLimit] = useState(50)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const observerRef = useRef(null)
   const loadMoreRef = useRef(null)
 
@@ -277,6 +280,9 @@ function PlantDetails() {
             <p>No measurement data available.</p>
           </div>
         )}
+        <button className="btn_secondary" onClick={() => setSettingsOpen(true)} style={{ marginTop: '1rem' }}>
+          Plant Settings
+        </button>
       </div>
 
       {measurements.length > 0 && (
@@ -320,6 +326,10 @@ function PlantDetails() {
           </div>
         )}
       </div>
+
+      <BottomSheet isOpen={settingsOpen} onClose={() => setSettingsOpen(false)}>
+        <PlantSettings plantId={id} onClose={() => setSettingsOpen(false)} />
+      </BottomSheet>
     </div>
   )
 }
