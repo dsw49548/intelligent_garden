@@ -67,3 +67,16 @@ export function getTrefleRecommendations(trefleId) {
             return res.json()
         })
 }
+
+export function fetchTreflePlantDetails(trefleId) {
+    return fetch(`${API_BASE}/api/plants/${trefleId}`)
+        .then(res => {
+            if (res.status === 404 || res.status === 500) {
+                return null
+            }
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`)
+            }
+            return res.json()
+        })
+}

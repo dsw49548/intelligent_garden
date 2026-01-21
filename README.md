@@ -23,17 +23,33 @@ npm install
 ### Uruchomienie
 
 **1. Backend**
+
+**Konfiguracja Trefle (opcjonalnie, dla danych roślin):**
+```bash
+cd backend
+# Utwórz plik .env i dodaj token Trefle:
+echo "TREFLE_TOKEN=your_token_here" > .env
+```
+
+**Uruchomienie:**
 ```bash
 cd backend
 bundle exec ruby app.rb
 ```
 Backend działa na `http://localhost:4567`
 
-Test sanity:
+**Test sanity:**
 ```bash
 curl http://localhost:4567/health
 ```
 Oczekiwany wynik: `{"status":"ok"}`
+
+**Test Trefle proxy (jeśli token ustawiony):**
+```bash
+curl "http://localhost:4567/api/plants/search?q=mon"
+curl "http://localhost:4567/api/plants/59042"
+curl "http://localhost:4567/api/plants/ping"
+```
 
 **2. Frontend**
 ```bash
@@ -113,7 +129,9 @@ Po uruchomieniu dostępne komendy:
 
 ## Struktura projektu
 
-- `backend/`` - API Sinatra + SQLite + Fake IoT CLI generator (`fake_iot.rb`)
+- `backend/` - API Sinatra + SQLite + Fake IoT CLI generator (`fake_iot.rb`)
+  - Endpointy API: `/health`, `/api/measurements`, `/api/measurements/latest`, `/api/measurements?plant_id=X&limit=Y`
+  - Endpointy Trefle proxy: `/api/plants/search?q=QUERY`, `/api/plants/:id`, `/api/plants/ping`
 - `frontend/` - React PWA (Vite + React Router + Chart.js)
 
 ## Scenariusz Android USB

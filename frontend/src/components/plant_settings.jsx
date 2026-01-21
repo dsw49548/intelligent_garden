@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getPlantById, updatePlant, deletePlant, getDefaultThresholds } from '../storage.js'
 
-function PlantSettings({ plantId, onClose }) {
+function PlantSettings({ plantId, onSave, onDelete, onClose }) {
     const navigate = useNavigate()
     const [plant, setPlant] = useState(null)
     const [thresholds, setThresholds] = useState(null)
@@ -77,20 +77,28 @@ function PlantSettings({ plantId, onClose }) {
             return
         }
 
-        updatePlant(plantId, { thresholds })
-        onClose()
+        const updated = updatePlant(plantId, { thresholds })
+        if (onSave && updated) {
+            onSave(updated)
+        } else {
+            onClose()
+        }
     }
 
     const handleDelete = () => {
-        if (confirm('Are you sure you want to delete this plant? This will also clear all cached measurements.')) {
-            deletePlant(plantId)
-            const cache = JSON.parse(localStorage.getItem('last_measurements') || '{}')
-            delete cache[plantId]
-            if (cache.history) {
-                delete cache.history[plantId]
+        if (onDelete) {
+            onDelete()
+        } else {
+            if (confirm('Are you sure you want to delete this plant? This will also clear all cached measurements.')) {
+                deletePlant(plantId)
+                const cache = JSON.parse(localStorage.getItem('last_measurements') || '{}')
+                delete cache[plantId]
+                if (cache.history) {
+                    delete cache.history[plantId]
+                }
+                localStorage.setItem('last_measurements', JSON.stringify(cache))
+                navigate('/')
             }
-            localStorage.setItem('last_measurements', JSON.stringify(cache))
-            navigate('/')
         }
     }
 

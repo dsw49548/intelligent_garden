@@ -111,10 +111,10 @@ export function saveCachedLatest(plantId, measurement) {
 
 export function calculateStatus(measurement, thresholds) {
   if (!measurement) return 'NO DATA'
-  
+
   const th = thresholds || getDefaultThresholds()
   let outOfRange = 0
-  
+
   if (measurement.soil_moisture < th.soil_moisture_min || measurement.soil_moisture > th.soil_moisture_max) {
     outOfRange++
   }
@@ -127,7 +127,7 @@ export function calculateStatus(measurement, thresholds) {
   if (measurement.light_lux < th.light_lux_min || measurement.light_lux > th.light_lux_max) {
     outOfRange++
   }
-  
+
   if (outOfRange === 0) return 'OK'
   if (outOfRange === 1) return 'WARN'
   return 'BAD'

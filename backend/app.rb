@@ -5,6 +5,7 @@ require 'time'
 require 'rack/cors'
 require 'net/http'
 require 'uri'
+require 'dotenv/load'
 
 use Rack::Cors do
   allow do
@@ -93,22 +94,32 @@ def validate_measurement(data)
   nil
 end
 
-TREFLE_TOKEN = ENV['TREFLE_TOKEN'] || 'usr-Sq8_eSyJ7L86Uz2WPScANwgKMVQRbrpO0W7GGCC1_9w'
+TREFLE_TOKEN = ENV['TREFLE_TOKEN']
 TREFLE_BASE = 'https://trefle.io/api/v1'
 
+def check_trefle_token
+  unless TREFLE_TOKEN && !TREFLE_TOKEN.empty?
+    status 500
+    return { error: 'TREFLE_TOKEN is missing' }.to_json
+  end
+  nil
+end
+
 def fetch_trefle(path)
-  full_path = path.include?('?') ? path : path
+  unless TREFLE_TOKEN && !TREFLE_TOKEN.empty?
+    return nil
+  end
+
+  separator = path.include?('?') ? '&' : '?'
+  full_path = "#{path}#{separator}token=#{URI.encode_www_form_component(TREFLE_TOKEN)}"
   uri = URI("#{TREFLE_BASE}#{full_path}")
+  
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = true
   http.read_timeout = 5
   http.open_timeout = 5
   
-  request_path = uri.path
-  request_path += "?#{uri.query}" if uri.query
-  request = Net::HTTP::Get.new(request_path)
-  request['Authorization'] = "Bearer #{TREFLE_TOKEN}"
-  
+  request = Net::HTTP::Get.new(uri.request_uri)
   response = http.request(request)
   
   if response.code.to_i == 200
@@ -119,6 +130,47 @@ def fetch_trefle(path)
 rescue => e
   puts "Trefle error: #{e.message}"
   nil
+end
+
+def extract_native_to(data)
+  return nil unless data
+  
+  main_species = data['main_species'] || data
+  distribution = main_species['distribution'] || {}
+  native = distribution['native'] || []
+  
+  if native.is_a?(Array) && native.length > 0
+    regions = native.first(5).map { |r| r.is_a?(Hash) ? r['name'] || r['slug'] : r.to_s }.compact
+    return regions.join(', ') + (native.length > 5 ? '...' : '') if regions.length > 0
+  end
+  
+  observations = main_species['observations'] || []
+  if observations.is_a?(Array) && observations.length > 0
+    obs_text = observations.first(3).map { |o| o.is_a?(Hash) ? o['name'] || o['slug'] : o.to_s }.compact.join(', ')
+    return obs_text if obs_text.length > 0 && obs_text.length < 100
+  end
+  
+  nil
+end
+
+def map_plant_details(trefle_data)
+  return nil unless trefle_data && trefle_data['data']
+  
+  data = trefle_data['data']
+  main_species = data['main_species'] || {}
+  
+  result = {
+    id: data['id'],
+    common_name: data['common_name'],
+    scientific_name: data['scientific_name'] || main_species['scientific_name'],
+    family: data['family'] || main_species['family'],
+    family_common_name: data['family_common_name'] || main_species['family_common_name'],
+    genus: data['genus'] || main_species['genus'],
+    image_url: data['image_url'] || main_species['image_url'],
+    native_to: extract_native_to(data)
+  }
+  
+  result.reject { |k, v| v.nil? || (v.is_a?(String) && v.empty?) }
 end
 
 def map_recommendations(trefle_data)
@@ -161,8 +213,26 @@ get '/health' do
   { status: 'ok' }.to_json
 end
 
+get '/api/plants/ping' do
+  content_type :json
+  
+  error = check_trefle_token
+  return error if error
+  
+  result = fetch_trefle("/plants/search?q=test")
+  if result
+    { ok: true }.to_json
+  else
+    status 500
+    { ok: false, error: 'Trefle unreachable' }.to_json
+  end
+end
+
 get '/api/plants/search' do
   content_type :json
+  
+  error = check_trefle_token
+  return error if error
   
   query = params['q']
   unless query && query.length >= 2
@@ -173,15 +243,42 @@ get '/api/plants/search' do
   result = fetch_trefle("/plants/search?q=#{URI.encode_www_form_component(query)}")
   
   if result && result['data']
-    plants = result['data'].map do |plant|
+    plants = result['data'].first(15).map do |plant|
       {
         id: plant['id'],
         scientific_name: plant['scientific_name'],
         common_name: plant['common_name'],
+        family: plant['family'],
+        family_common_name: plant['family_common_name'],
+        genus: plant['genus'],
+        image_url: plant['image_url'],
         slug: plant['slug']
       }
     end
     { data: plants }.to_json
+  else
+    status 404
+    { error: 'not found' }.to_json
+  end
+end
+
+get '/api/plants/:id' do
+  content_type :json
+  
+  error = check_trefle_token
+  return error if error
+  
+  trefle_id = params['id']
+  result = fetch_trefle("/plants/#{trefle_id}")
+  
+  if result
+    mapped = map_plant_details(result)
+    if mapped
+      mapped.to_json
+    else
+      status 404
+      { error: 'not found' }.to_json
+    end
   else
     status 404
     { error: 'not found' }.to_json

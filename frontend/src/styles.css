@@ -581,6 +581,7 @@ body {
   from {
     transform: translateY(100%);
   }
+
   to {
     transform: translateY(0);
   }
@@ -867,6 +868,147 @@ body {
   text-align: center;
 }
 
+.plant_details_page {
+  min-height: 100vh;
+  background: #0b0f14;
+  padding-bottom: 5rem;
+}
+
+.plant_cover_container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+.plant_cover_image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.plant_cover_gradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  background: linear-gradient(to top, rgba(11, 15, 20, 0.9), transparent);
+  pointer-events: none;
+}
+
+.plant_cover_placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+}
+
+.plant_details_content {
+  padding: 1.5rem 1rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.plant_names {
+  margin-bottom: 1.5rem;
+}
+
+.plant_common_name {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.5rem;
+  line-height: 1.2;
+}
+
+.plant_scientific_name {
+  font-size: 1.1rem;
+  font-style: italic;
+  color: #aaa;
+  margin: 0;
+}
+
+.plant_info {
+  background: #1e1e1e;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #333;
+}
+
+.plant_info_item {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.plant_info_item:last-child {
+  border-bottom: none;
+}
+
+.plant_info_label {
+  font-weight: 600;
+  color: #ccc;
+  min-width: 100px;
+}
+
+.plant_info_value {
+  color: #f5f5f5;
+  flex: 1;
+}
+
+.plant_status_section {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.chart_section {
+  margin-bottom: 2rem;
+}
+
+.chart_section:last-child {
+  margin-bottom: 0;
+}
+
+.chart_subtitle {
+  font-size: 1rem;
+  color: #aaa;
+  margin-bottom: 0.75rem;
+  font-weight: 500;
+}
+
+.floating_settings_button {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: #0066cc;
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
+  z-index: 1000;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.floating_settings_button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 102, 204, 0.5);
+}
+
+.floating_settings_button:active {
+  transform: translateY(0);
+}
+
+.plant_details_spacer {
+  height: 2rem;
+}
+
 @media (min-width: 768px) {
   .content {
     padding: 2rem;
@@ -882,5 +1024,18 @@ body {
 
   .kv_value {
     font-size: 1.1rem;
+  }
+
+  .plant_details_content {
+    padding: 2rem;
+  }
+
+  .plant_common_name {
+    font-size: 2.5rem;
+  }
+
+  .floating_settings_button {
+    bottom: 2rem;
+    right: 2rem;
   }
 }
