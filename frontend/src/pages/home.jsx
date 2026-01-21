@@ -12,7 +12,7 @@ function Home() {
   useEffect(() => {
     const allPlants = getPlants()
     setPlants(allPlants)
-    
+
     if (allPlants.length === 0) {
       setLoading(false)
       return
