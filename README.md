@@ -66,60 +66,58 @@ Po uruchomieniu dostępne komendy:
 - `set <ID1,ID2,...>` - ustaw listę plant_id
 - `quit` - wyjście
 
-### Sanity Flow
+### Sanity Flow (Demo)
 
-1. Uruchom backend: `cd backend && bundle exec ruby app.rb`
-2. W nowym terminalu uruchom fake_iot: `cd backend && bundle exec ruby fake_iot.rb`
-3. W fake_iot CLI wykonaj: `once` (lub `start` dla ciągłej wysyłki)
-4. Uruchom frontend: `cd frontend && npm run dev -- --host`
-5. Otwórz w przeglądarce: `http://localhost:5173`
-6. Przejdź do zakładki "History" - powinny być widoczne pomiary
+1. **Uruchom backend:**
+   ```bash
+   cd backend
+   bundle exec ruby app.rb
+   ```
+   Backend działa na `http://localhost:4567`
 
-## Uruchomienie projektu (Backend / Frontend / Fake IoT)
+2. **W nowym terminalu uruchom Fake IoT:**
+   ```bash
+   cd backend
+   bundle exec ruby fake_iot.rb
+   ```
+   W CLI wykonaj:
+   - `set 1` - ustaw plant_id=1
+   - `once` - wyślij jeden pomiar (lub `start` dla ciągłej wysyłki)
 
-### Instalacja zależności
+3. **Uruchom frontend:**
+   ```bash
+   cd frontend
+   npm run dev -- --host
+   ```
+   Frontend działa na `http://localhost:5173`
 
-**Backend:**
-- `bundle install` - tylko po zmianie Gemfile/Gemfile.lock lub na świeżym klonie
+4. **Otwórz w przeglądarce:**
+   - Wejdź na `http://localhost:5173`
+   - Kliknij kafelek "+ Add plant" i dodaj roślinę
+   - Kliknij na roślinę, aby zobaczyć szczegóły i wykresy
+   - Wykresy i historia pojawią się po wysłaniu pomiarów przez Fake IoT
 
-**Frontend:**
-- `npm install` - tylko po zmianie package-lock.json/package.json lub na świeżym klonie
+## Kiedy instalować zależności?
 
-### Kolejność uruchomienia
+**Backend (`bundle install`):**
+- Tylko po zmianie `Gemfile` lub `Gemfile.lock`
+- Na świeżym klonie repozytorium
+- Jeśli pojawiają się błędy o brakujących gemach
 
-**1. Backend:**
-```bash
-cd backend
-bundle exec ruby app.rb
-```
-Backend działa na: `http://localhost:4567`
+**Frontend (`npm install`):**
+- Tylko po zmianie `package.json` lub `package-lock.json`
+- Na świeżym klonie repozytorium
+- Jeśli pojawiają się błędy o brakujących pakietach
 
-**2. Frontend:**
-```bash
-cd frontend
-npm run dev -- --host
-```
-Frontend działa na: `http://localhost:5173`
+**Uwaga:** Jeśli już masz zainstalowane zależności i wszystko działa, nie musisz ponownie uruchamiać `bundle install` ani `npm install` przy każdym starcie.
 
-**3. Fake IoT (opcjonalnie):**
-```bash
-cd backend
-bundle exec ruby fake_iot.rb
-```
-W CLI wykonaj komendy:
-- `status` - sprawdź stan
-- `once` - wyślij jeden pomiar
-- `start` - rozpocznij ciągłą wysyłkę
-- `stop` - zatrzymaj wysyłkę
-- `help` - lista komend
+## Struktura projektu
 
-### Scenariusz Android USB
+- `backend/`` - API Sinatra + SQLite + Fake IoT CLI generator (`fake_iot.rb`)
+- `frontend/` - React PWA (Vite + React Router + Chart.js)
+
+## Scenariusz Android USB
 
 Jeśli testujesz na urządzeniu Android przez USB:
 - użyj `adb reverse tcp:5173 tcp:5173` dla frontendu
 - użyj `adb reverse tcp:4567 tcp:4567` dla backendu
-
-### Struktura projektu
-
-- `backend/` - API Sinatra + SQLite + Fake IoT CLI generator (fake_iot.rb)
-- `frontend/` - React PWA
