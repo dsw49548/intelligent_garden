@@ -117,12 +117,14 @@ rescue => e
 end
 
 def print_status(state)
+  puts ""
   puts "Status:"
   puts "  URL: #{state[:base_url]}"
-  puts "  Plants: #{state[:plants].join(', ')}"
+  puts "  Plants: #{state[:plants].empty? ? '(none)' : state[:plants].join(', ')}"
   puts "  Mode: #{state[:mode]}"
   puts "  Interval: #{state[:interval]}s"
   puts "  Running: #{state[:sending]}"
+  puts ""
 end
 
 def print_help
@@ -178,6 +180,7 @@ def handle_command(cmd, state)
       state[:sending] = true
       state[:thread] = Thread.new { run_loop(state) }
       puts "started"
+      print_status(state)
     end
   when "stop"
     if state[:sending]
@@ -187,6 +190,7 @@ def handle_command(cmd, state)
         state[:thread] = nil
       end
       puts "stopped"
+      print_status(state)
     else
       puts "not running"
     end
@@ -196,6 +200,7 @@ def handle_command(cmd, state)
     if arg && arg.match(/^\d+$/)
       state[:base_url] = "http://localhost:#{arg}"
       puts "URL set to #{state[:base_url]}"
+      print_status(state)
     else
       puts "invalid port"
     end
@@ -203,6 +208,7 @@ def handle_command(cmd, state)
     if arg && arg.match(/^https?:\/\//)
       state[:base_url] = arg
       puts "URL set to #{state[:base_url]}"
+      print_status(state)
     else
       puts "invalid URL"
     end
@@ -212,6 +218,7 @@ def handle_command(cmd, state)
       if val >= 0.2 && val <= 3600
         state[:interval] = val
         puts "interval set to #{val}s"
+        print_status(state)
       else
         puts "interval must be between 0.2 and 3600"
       end
@@ -225,6 +232,7 @@ def handle_command(cmd, state)
         state[:mode] = mode
         state[:plant_state] = {}
         puts "mode set to #{mode}"
+        print_status(state)
       else
         puts "unknown mode: #{mode}"
       end
@@ -243,6 +251,7 @@ def handle_command(cmd, state)
       unless state[:plants].include?(id)
         state[:plants] << id
         puts "added plant #{id}"
+        print_status(state)
       else
         puts "plant #{id} already exists"
       end
@@ -256,6 +265,7 @@ def handle_command(cmd, state)
         state[:plants].delete(id)
         state[:plant_state].delete(id)
         puts "removed plant #{id}"
+        print_status(state)
       else
         puts "not found"
       end
@@ -271,6 +281,7 @@ def handle_command(cmd, state)
         state[:plants] = ids
         state[:plant_state].delete_if { |k, v| !ids.include?(k) }
         puts "plants set to: #{ids.join(', ')}"
+        print_status(state)
       end
     else
       puts "missing plant IDs"
@@ -282,6 +293,7 @@ def handle_command(cmd, state)
       state[:plants] = []
       state[:plant_state] = {}
       puts "cleared"
+      print_status(state)
     end
   when "quit", "exit"
     if state[:sending]
@@ -302,9 +314,7 @@ end
 
 puts "=== Fake IoT Generator ==="
 puts "Type 'help' for commands"
-puts ""
 print_status(state)
-puts ""
 
 loop do
   print "> "
