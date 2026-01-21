@@ -1,19 +1,21 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/layout.jsx'
-import Home from './pages/home.jsx'
-import Plant from './pages/plant.jsx'
-import History from './pages/history.jsx'
-import Settings from './pages/settings.jsx'
+import Plants from './pages/plants.jsx'
+import AddPlant from './pages/add_plant.jsx'
+import PlantDetails from './pages/plant_details.jsx'
+import AppSettings from './pages/app_settings.jsx'
+import About from './pages/about.jsx'
 
 function App() {
   return (
     <BrowserRouter>
       <Layout>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/plant/:id" element={<Plant />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/" element={<Plants />} />
+          <Route path="/add" element={<AddPlant />} />
+          <Route path="/plant/:id" element={<PlantDetails />} />
+          <Route path="/settings" element={<AppSettings />} />
+          <Route path="/about" element={<About />} />
         </Routes>
       </Layout>
     </BrowserRouter>
