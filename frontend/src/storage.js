@@ -139,3 +139,15 @@ export function calculateStatus(measurement, thresholds) {
   if (outOfRange === 1) return 'WARN'
   return 'BAD'
 }
+
+export function getCachedHistory(plantId) {
+  const cache = getLastMeasurements()
+  return cache.history?.[plantId] || []
+}
+
+export function saveCachedHistory(plantId, measurements) {
+  const cache = getLastMeasurements()
+  if (!cache.history) cache.history = {}
+  cache.history[plantId] = measurements
+  saveLastMeasurements(cache)
+}
