@@ -31,7 +31,7 @@ function PlantDetails() {
             return
         }
         setPlant(foundPlant)
-        
+
         if (foundPlant.trefle && foundPlant.trefle.id) {
             fetchTreflePlantDetails(foundPlant.trefle.id)
                 .then(data => {
@@ -42,7 +42,7 @@ function PlantDetails() {
                         setPlant({ ...foundPlant, trefle: mergedTrefle })
                     }
                 })
-                .catch(() => {})
+                .catch(() => { })
         }
     }
 

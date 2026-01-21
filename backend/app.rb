@@ -3,9 +3,9 @@ require 'json'
 require 'sequel'
 require 'time'
 require 'rack/cors'
-require 'net/http'
-require 'uri'
 require 'dotenv/load'
+require 'cgi'
+require_relative 'lib/trefle_client'
 
 use Rack::Cors do
   allow do
@@ -95,7 +95,6 @@ def validate_measurement(data)
 end
 
 TREFLE_TOKEN = ENV['TREFLE_TOKEN']
-TREFLE_BASE = 'https://trefle.io/api/v1'
 
 def check_trefle_token
   unless TREFLE_TOKEN && !TREFLE_TOKEN.empty?
@@ -106,30 +105,7 @@ def check_trefle_token
 end
 
 def fetch_trefle(path)
-  unless TREFLE_TOKEN && !TREFLE_TOKEN.empty?
-    return nil
-  end
-
-  separator = path.include?('?') ? '&' : '?'
-  full_path = "#{path}#{separator}token=#{URI.encode_www_form_component(TREFLE_TOKEN)}"
-  uri = URI("#{TREFLE_BASE}#{full_path}")
-  
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-  http.read_timeout = 5
-  http.open_timeout = 5
-  
-  request = Net::HTTP::Get.new(uri.request_uri)
-  response = http.request(request)
-  
-  if response.code.to_i == 200
-    JSON.parse(response.body)
-  else
-    nil
-  end
-rescue => e
-  puts "Trefle error: #{e.message}"
-  nil
+  TrefleClient.fetch(path, TREFLE_TOKEN)
 end
 
 def extract_native_to(data)
@@ -153,19 +129,30 @@ def extract_native_to(data)
   nil
 end
 
+def extract_string_value(value)
+  return nil if value.nil?
+  return value if value.is_a?(String)
+  return value['name'] if value.is_a?(Hash) && value['name']
+  nil
+end
+
 def map_plant_details(trefle_data)
   return nil unless trefle_data && trefle_data['data']
   
   data = trefle_data['data']
   main_species = data['main_species'] || {}
   
+  family_val = extract_string_value(data['family']) || extract_string_value(main_species['family'])
+  genus_val = extract_string_value(data['genus']) || extract_string_value(main_species['genus'])
+  family_common_name_val = data['family_common_name'] || main_species['family_common_name']
+  
   result = {
     id: data['id'],
     common_name: data['common_name'],
     scientific_name: data['scientific_name'] || main_species['scientific_name'],
-    family: data['family'] || main_species['family'],
-    family_common_name: data['family_common_name'] || main_species['family_common_name'],
-    genus: data['genus'] || main_species['genus'],
+    family: family_val,
+    family_common_name: family_common_name_val,
+    genus: genus_val,
     image_url: data['image_url'] || main_species['image_url'],
     native_to: extract_native_to(data)
   }
@@ -240,7 +227,7 @@ get '/api/plants/search' do
     return { error: 'query too short (min 2 chars)' }.to_json
   end
   
-  result = fetch_trefle("/plants/search?q=#{URI.encode_www_form_component(query)}")
+  result = fetch_trefle("/plants/search?q=#{CGI.escape(query)}")
   
   if result && result['data']
     plants = result['data'].first(15).map do |plant|
