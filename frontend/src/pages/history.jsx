@@ -103,14 +103,34 @@ function History() {
     )
   }
 
-  const labels = measurements.map(m => {
+  const validMeasurements = measurements.filter(m => {
+    if (!m.measured_at) return false
+    const date = new Date(m.measured_at)
+    return !isNaN(date.getTime())
+  })
+
+  if (validMeasurements.length === 0) {
+    return (
+      <div className="card">
+        <div className="empty_state">
+          <p>No valid measurement data available.</p>
+        </div>
+      </div>
+    )
+  }
+
+  const sortedMeasurements = [...validMeasurements].sort((a, b) => {
+    return new Date(a.measured_at) - new Date(b.measured_at)
+  })
+
+  const labels = sortedMeasurements.map(m => {
     const date = new Date(m.measured_at)
     return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
   })
-  const soilData = measurements.map(m => m.soil_moisture)
-  const tempData = measurements.map(m => m.air_temp_c)
-  const humidityData = measurements.map(m => m.air_humidity)
-  const lightData = measurements.map(m => m.light_lux)
+  const soilData = sortedMeasurements.map(m => m.soil_moisture)
+  const tempData = sortedMeasurements.map(m => m.air_temp_c)
+  const humidityData = sortedMeasurements.map(m => m.air_humidity)
+  const lightData = sortedMeasurements.map(m => m.light_lux)
 
   const chartData = {
     labels,
@@ -170,7 +190,8 @@ function History() {
           font: {
             size: 10
           },
-          maxTicksLimit: 6
+          maxTicksLimit: 8,
+          autoSkip: true
         },
         grid: {
           color: '#2a2a2a'
