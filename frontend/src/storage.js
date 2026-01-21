@@ -7,18 +7,46 @@ export function savePlants(plants) {
   localStorage.setItem('plants', JSON.stringify(plants))
 }
 
-export function addPlant(plant) {
+export function getPlantById(id) {
   const plants = getPlants()
-  const maxId = plants.length > 0 ? Math.max(...plants.map(p => Number(p.id))) : 0
-  const newId = maxId + 1
+  return plants.find(p => p.id === id) || null
+}
+
+export function addPlant(plantData) {
+  const plants = getPlants()
   const newPlant = {
-    id: newId,
-    ...plant
+    id: Date.now().toString(),
+    name: plantData.name || 'Unnamed Plant',
+    photo: plantData.photo || null,
+    trefle: plantData.trefle || null,
+    thresholds: plantData.thresholds || getDefaultThresholds(),
+    created_at: new Date().toISOString()
   }
   plants.push(newPlant)
   savePlants(plants)
-  setActivePlantId(newId)
   return newPlant
+}
+
+export function updatePlant(id, updates) {
+  const plants = getPlants()
+  const index = plants.findIndex(p => p.id === id)
+  if (index === -1) return null
+  plants[index] = { ...plants[index], ...updates }
+  savePlants(plants)
+  return plants[index]
+}
+
+export function getDefaultThresholds() {
+  return {
+    soil_moisture_min: 30,
+    soil_moisture_max: 70,
+    air_temp_c_min: 18,
+    air_temp_c_max: 28,
+    air_humidity_min: 40,
+    air_humidity_max: 70,
+    light_lux_min: 500,
+    light_lux_max: 5000
+  }
 }
 
 export function deletePlant(plantId) {
