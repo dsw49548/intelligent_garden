@@ -191,6 +191,7 @@ body {
 .form_actions .btn_primary,
 .form_actions .btn_secondary {
   flex: 1;
+  width: auto;
 }
 
 .bottom_nav {
@@ -297,7 +298,6 @@ body {
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s, transform 0.1s;
-  width: 100%;
 }
 
 .btn_secondary:hover {
