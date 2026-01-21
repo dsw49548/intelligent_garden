@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 
+const APP_VERSION = '1.0.0'
+
 function Drawer({ isOpen, onClose }) {
     if (!isOpen) return null
 
@@ -17,7 +19,7 @@ function Drawer({ isOpen, onClose }) {
                     <Link to="/about" onClick={onClose}>About</Link>
                 </nav>
                 <div className="drawer_footer">
-                    <p>Version 1.0.0</p>
+                    <p>Version {APP_VERSION}</p>
                 </div>
             </div>
         </>

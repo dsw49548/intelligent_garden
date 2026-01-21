@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
-import { getPlantById, getCachedLatest, saveCachedLatest, calculateStatus, getCachedHistory, saveCachedHistory } from '../storage.js'
+import { getPlantById, getCachedLatest, saveCachedLatest, calculateStatus, getCachedHistory, saveCachedHistory, getLastMeasurements, saveLastMeasurements } from '../storage.js'
 import { fetchLatestMeasurement, fetchMeasurements } from '../api.js'
 import BottomSheet from '../components/bottom_sheet.jsx'
 import PlantSettings from '../components/plant_settings.jsx'
@@ -53,6 +53,9 @@ function PlantDetails() {
         setLoading(false)
       })
       .catch(() => {
+        const cache = getLastMeasurements()
+        cache.lastFetchOk = false
+        saveLastMeasurements(cache)
         if (!cached) {
           setMeasurement(null)
           setStatus('NO DATA')

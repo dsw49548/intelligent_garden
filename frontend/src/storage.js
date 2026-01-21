@@ -104,6 +104,8 @@ export function getCachedLatest(plantId) {
 export function saveCachedLatest(plantId, measurement) {
   const cache = getLastMeasurements()
   cache[plantId] = measurement
+  cache.lastFetchOk = true
+  cache.lastFetchTime = new Date().toISOString()
   saveLastMeasurements(cache)
 }
 
