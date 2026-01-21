@@ -27,7 +27,7 @@ function PlantDetails() {
     const loadPlant = () => {
         const foundPlant = getPlantById(id)
         if (!foundPlant) {
-            navigate('/')
+            setLoading(false)
             return
         }
         setPlant(foundPlant)
@@ -182,7 +182,13 @@ function PlantDetails() {
     }
 
     if (!plant) {
-        return null
+        return (
+            <div className="card">
+                <div className="empty_state">
+                    <p>Plant not found</p>
+                </div>
+            </div>
+        )
     }
 
     const statusEmoji = {

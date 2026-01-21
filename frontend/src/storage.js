@@ -14,8 +14,13 @@ export function getPlantById(id) {
 
 export function addPlant(plantData) {
   const plants = getPlants()
+  const maxId = plants.length > 0 ? Math.max(...plants.map(p => {
+    const numId = parseInt(p.id, 10)
+    return isNaN(numId) ? 0 : numId
+  })) : 0
+  const newId = String(maxId + 1)
   const newPlant = {
-    id: Date.now().toString(),
+    id: newId,
     name: plantData.name || 'Unnamed Plant',
     photo: plantData.photo || null,
     trefle: plantData.trefle || null,

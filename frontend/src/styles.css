@@ -296,6 +296,21 @@ body {
   background: #555;
 }
 
+.btn_text {
+  background: transparent;
+  color: #aaa;
+  border: none;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.btn_text:hover {
+  color: #fff;
+}
+
 .btn_danger {
   background: #5a2d2d;
   color: #ff6b6b;
@@ -485,6 +500,19 @@ body {
   font-size: 1.1rem;
   color: #f5f5f5;
   margin: 0;
+}
+
+.plant_tile_status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.plant_tile_description {
+  font-size: 0.75rem;
+  color: #888;
+  font-style: italic;
 }
 
 .plant_tile_add {
@@ -815,6 +843,15 @@ body {
 [data-theme="light"] .card {
   background: var(--bg-secondary);
   border-color: var(--border);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .card_title {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .card_subtitle {
+  color: var(--text-secondary);
 }
 
 [data-theme="light"] .top_bar {
@@ -822,10 +859,100 @@ body {
   border-color: var(--border);
 }
 
+[data-theme="light"] .top_bar h1 {
+  color: var(--text-primary);
+}
+
 [data-theme="light"] .input {
   background: #ffffff;
   border-color: var(--border);
   color: var(--text-primary);
+}
+
+[data-theme="light"] .label {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .plant_tile {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+[data-theme="light"] .plant_tile_info h3 {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .plant_tile_description {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .kv_label {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .kv_value {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .btn_secondary {
+  background: #e0e0e0;
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .btn_secondary:hover {
+  background: #d0d0d0;
+}
+
+[data-theme="light"] .btn_text {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .btn_text:hover {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .search_results {
+  background: #ffffff;
+  border-color: var(--border);
+}
+
+[data-theme="light"] .search_result_item {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .search_result_item:hover {
+  background: var(--bg-secondary);
+}
+
+[data-theme="light"] .threshold_label {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .threshold_input input {
+  background: #ffffff;
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .plant_info {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+[data-theme="light"] .plant_info_label {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .plant_info_value {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .plant_common_name {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .plant_scientific_name {
+  color: var(--text-secondary);
 }
 
 .search_results {

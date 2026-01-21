@@ -1,54 +1,76 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { addPlant } from '../storage.js'
+import { addPlant, getDefaultThresholds } from '../storage.js'
 import { searchTreflePlants, getTrefleRecommendations } from '../api.js'
 
 function AddPlant() {
     const navigate = useNavigate()
     const [name, setName] = useState('')
     const [photo, setPhoto] = useState(null)
-    const [searchQuery, setSearchQuery] = useState('')
     const [searchResults, setSearchResults] = useState([])
     const [selectedTrefle, setSelectedTrefle] = useState(null)
-    const [recommendedThresholds, setRecommendedThresholds] = useState(null)
-    const [showRecommended, setShowRecommended] = useState(false)
-    const [searchTimeout, setSearchTimeout] = useState(null)
+    const [thresholds, setThresholds] = useState(getDefaultThresholds())
+    const [showThresholds, setShowThresholds] = useState(false)
     const fileInputRef = useRef(null)
+    const searchTimeoutRef = useRef(null)
 
-    useEffect(() => {
-        if (searchQuery.length >= 2) {
-            const timeout = setTimeout(() => {
-                searchTreflePlants(searchQuery)
+    const debounceSearch = useCallback((query) => {
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current)
+        }
+        searchTimeoutRef.current = setTimeout(() => {
+            if (query.length >= 2) {
+                searchTreflePlants(query)
                     .then(result => {
-                        setSearchResults(result.data || [])
+                        const filtered = (result.data || []).filter(plant => {
+                            const queryLower = query.toLowerCase()
+                            const commonName = (plant.common_name || '').toLowerCase()
+                            const scientificName = (plant.scientific_name || '').toLowerCase()
+                            return commonName.startsWith(queryLower) || scientificName.startsWith(queryLower)
+                        })
+                        setSearchResults(filtered)
                     })
                     .catch(() => {
                         setSearchResults([])
                     })
-            }, 400)
-            return () => clearTimeout(timeout)
-        } else {
-            setSearchResults([])
-        }
-    }, [searchQuery])
+            } else {
+                setSearchResults([])
+            }
+        }, 350)
+    }, [])
+
+    useEffect(() => {
+        setName(name)
+        debounceSearch(name)
+    }, [name, debounceSearch])
 
     const handleSelectTrefle = (plant) => {
         setSelectedTrefle(plant)
         setName(plant.common_name || plant.scientific_name)
-        setSearchQuery('')
         setSearchResults([])
 
         getTrefleRecommendations(plant.id)
             .then(result => {
                 if (result && result.recommendations) {
-                    setRecommendedThresholds(result.recommendations)
-                    setShowRecommended(true)
+                    setThresholds(result.recommendations)
+                    setShowThresholds(true)
+                } else {
+                    setThresholds(getDefaultThresholds())
+                    setShowThresholds(true)
                 }
             })
             .catch(() => {
-                setRecommendedThresholds(null)
-                setShowRecommended(false)
+                setThresholds(getDefaultThresholds())
+                setShowThresholds(true)
             })
+    }
+
+    const handleThresholdChange = (key, type, value) => {
+        const numValue = parseFloat(value) || 0
+        setThresholds(prev => ({
+            ...prev,
+            [`${key}_${type}`]: numValue
+        }))
     }
 
     const handlePhotoChange = (e) => {
@@ -77,10 +99,43 @@ function AddPlant() {
                 name: name.trim(),
                 photo: photo,
                 trefle: selectedTrefle,
-                thresholds: recommendedThresholds
+                thresholds: thresholds
             })
             navigate('/')
         }
+    }
+
+    const renderThreshold = (key, label, unit = '') => {
+        const minKey = `${key}_min`
+        const maxKey = `${key}_max`
+        const min = thresholds[minKey] || 0
+        const max = thresholds[maxKey] || 100
+
+        return (
+            <div className="threshold_group" key={key}>
+                <label className="threshold_label">{label}</label>
+                <div className="threshold_inputs">
+                    <div className="threshold_input">
+                        <label>Min</label>
+                        <input
+                            type="number"
+                            value={min}
+                            onChange={(e) => handleThresholdChange(key, 'min', e.target.value)}
+                        />
+                        <span>{unit}</span>
+                    </div>
+                    <div className="threshold_input">
+                        <label>Max</label>
+                        <input
+                            type="number"
+                            value={max}
+                            onChange={(e) => handleThresholdChange(key, 'max', e.target.value)}
+                        />
+                        <span>{unit}</span>
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     return (
@@ -88,14 +143,15 @@ function AddPlant() {
             <h2 className="card_title">Add Plant</h2>
             <form onSubmit={handleSubmit}>
                 <div className="form_group">
-                    <label htmlFor="plant-search" className="label">Search Plant (optional)</label>
+                    <label htmlFor="plant-name" className="label">Plant name</label>
                     <input
-                        id="plant-search"
+                        id="plant-name"
                         type="text"
                         className="input"
-                        placeholder="Search for plant name..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Enter plant name or search Trefle"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
                     />
                     {searchResults.length > 0 && (
                         <div className="search_results">
@@ -115,24 +171,23 @@ function AddPlant() {
                             ))}
                         </div>
                     )}
-                </div>
-                <div className="form_group">
-                    <label htmlFor="plant-name" className="label">Plant Name</label>
-                    <input
-                        id="plant-name"
-                        type="text"
-                        className="input"
-                        placeholder="Enter plant name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                    />
-                    {showRecommended && recommendedThresholds && (
-                        <div className="recommended_badge">
+                    {selectedTrefle && (
+                        <div className="recommended_badge" style={{ marginTop: '0.5rem' }}>
                             Recommended values loaded
                         </div>
                     )}
                 </div>
+
+                {showThresholds && (
+                    <div className="form_group">
+                        <h3 className="card_subtitle" style={{ marginBottom: '1rem' }}>Thresholds</h3>
+                        {renderThreshold('soil_moisture', 'Soil Moisture', '%')}
+                        {renderThreshold('air_temp_c', 'Air Temperature', '°C')}
+                        {renderThreshold('air_humidity', 'Air Humidity', '%')}
+                        {renderThreshold('light_lux', 'Light', 'lux')}
+                    </div>
+                )}
+
                 <div className="form_group">
                     <input
                         ref={fileInputRef}
@@ -148,8 +203,9 @@ function AddPlant() {
                         <img src={photo} alt="Plant preview" className="photo_preview" />
                     )}
                 </div>
+
                 <div className="form_actions">
-                    <button type="button" className="btn_secondary" onClick={() => navigate('/')}>
+                    <button type="button" className="btn_text" onClick={() => navigate('/')}>
                         Cancel
                     </button>
                     <button type="submit" className="btn_primary" disabled={!name.trim()}>
