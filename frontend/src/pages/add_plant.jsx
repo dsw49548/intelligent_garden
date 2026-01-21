@@ -10,7 +10,6 @@ function AddPlant() {
     const [searchResults, setSearchResults] = useState([])
     const [selectedTrefle, setSelectedTrefle] = useState(null)
     const [thresholds, setThresholds] = useState(getDefaultThresholds())
-    const [showThresholds, setShowThresholds] = useState(false)
     const [searchLoading, setSearchLoading] = useState(false)
     const [searchError, setSearchError] = useState(null)
     const fileInputRef = useRef(null)
@@ -27,14 +26,7 @@ function AddPlant() {
                 searchTreflePlants(query)
                     .then(result => {
                         const data = result.data || result.plants || []
-                        const filtered = data.filter(plant => {
-                            if (!plant) return false
-                            const queryLower = query.toLowerCase()
-                            const commonName = (plant.common_name || '').toLowerCase()
-                            const scientificName = (plant.scientific_name || '').toLowerCase()
-                            return commonName.startsWith(queryLower) || scientificName.startsWith(queryLower)
-                        })
-                        setSearchResults(filtered)
+                        setSearchResults(data.slice(0, 20))
                         setSearchLoading(false)
                     })
                     .catch((err) => {
@@ -48,7 +40,7 @@ function AddPlant() {
                 setSearchLoading(false)
                 setSearchError(null)
             }
-        }, 350)
+        }, 300)
     }, [])
 
     useEffect(() => {
@@ -62,7 +54,6 @@ function AddPlant() {
         setSearchResults([])
         setSearchLoading(false)
         setSearchError(null)
-        setShowThresholds(true)
 
         getTrefleRecommendations(plant.id)
             .then(result => {
@@ -154,7 +145,7 @@ function AddPlant() {
         <div className="card">
             <h2 className="card_title">Add Plant</h2>
             <form onSubmit={handleSubmit}>
-                <div className="form_group">
+                <div className="form_group" style={{ position: 'relative' }}>
                     <label htmlFor="plant-name" className="label">Plant name</label>
                     <input
                         id="plant-name"
@@ -163,48 +154,54 @@ function AddPlant() {
                         placeholder="Enter plant name or search Trefle"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
+                        onBlur={(e) => {
+                            setTimeout(() => {
+                                if (!e.relatedTarget || !e.relatedTarget.closest('.search_results')) {
+                                    setSearchResults([])
+                                }
+                            }, 200)
+                        }}
                         required
                     />
-                    {searchLoading && (
-                        <div className="search_results">
-                            <div className="search_result_item" style={{ color: '#aaa', fontStyle: 'italic' }}>
-                                Loading...
-                            </div>
-                        </div>
-                    )}
-                    {searchError && (
-                        <div className="search_results">
-                            <div className="search_result_item" style={{ color: '#ff6b6b' }}>
-                                Error: {searchError}
-                            </div>
-                        </div>
-                    )}
-                    {!searchLoading && !searchError && searchResults.length > 0 && (
-                        <div className="search_results">
-                            {searchResults.map(plant => (
-                                <div
-                                    key={plant.id}
-                                    className="search_result_item"
-                                    onClick={() => handleSelectTrefle(plant)}
-                                >
-                                    <div>
-                                        <strong>{plant.common_name || plant.scientific_name}</strong>
-                                        {plant.scientific_name && plant.common_name && (
-                                            <div className="search_result_scientific">{plant.scientific_name}</div>
-                                        )}
-                                        {plant.family && (
-                                            <div className="search_result_scientific">{plant.family}</div>
-                                        )}
-                                    </div>
+                    {(searchLoading || searchError || searchResults.length > 0 || (name.length >= 2 && searchResults.length === 0)) && (
+                        <div className="search_results_dropdown">
+                            {searchLoading && (
+                                <div className="search_result_item" style={{ color: '#aaa', fontStyle: 'italic' }}>
+                                    Loading...
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                    {!searchLoading && !searchError && name.length >= 2 && searchResults.length === 0 && (
-                        <div className="search_results">
-                            <div className="search_result_item" style={{ color: '#aaa', fontStyle: 'italic' }}>
-                                No results found
-                            </div>
+                            )}
+                            {searchError && (
+                                <div className="search_result_item" style={{ color: '#ff6b6b' }}>
+                                    Error: {searchError}
+                                </div>
+                            )}
+                            {!searchLoading && !searchError && searchResults.length > 0 && (
+                                <>
+                                    {searchResults.map(plant => (
+                                        <div
+                                            key={plant.id}
+                                            className="search_result_item"
+                                            onClick={() => handleSelectTrefle(plant)}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                        >
+                                            <div>
+                                                <strong>{plant.common_name || plant.scientific_name}</strong>
+                                                {plant.scientific_name && plant.common_name && (
+                                                    <div className="search_result_scientific">{plant.scientific_name}</div>
+                                                )}
+                                                {plant.family && (
+                                                    <div className="search_result_scientific">{plant.family}</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </>
+                            )}
+                            {!searchLoading && !searchError && name.length >= 2 && searchResults.length === 0 && (
+                                <div className="search_result_item" style={{ color: '#aaa', fontStyle: 'italic' }}>
+                                    No results found
+                                </div>
+                            )}
                         </div>
                     )}
                     {selectedTrefle && (
@@ -214,9 +211,9 @@ function AddPlant() {
                     )}
                 </div>
 
-                {(showThresholds || selectedTrefle) && (
+                {name.length > 0 && (
                     <div className="form_group">
-                        <h3 className="card_subtitle" style={{ marginBottom: '1rem' }}>Thresholds</h3>
+                        <h3 className="card_subtitle" style={{ marginBottom: '1rem' }}>Plant thresholds</h3>
                         {renderThreshold('soil_moisture', 'Soil Moisture', '%')}
                         {renderThreshold('air_temp_c', 'Air Temperature', '°C')}
                         {renderThreshold('air_humidity', 'Air Humidity', '%')}
