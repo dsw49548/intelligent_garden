@@ -41,3 +41,29 @@ export function postMeasurement(data) {
             return res.json()
         })
 }
+
+export function searchTreflePlants(query) {
+    return fetch(`${API_BASE}/api/plants/search?q=${encodeURIComponent(query)}`)
+        .then(res => {
+            if (res.status === 404) {
+                return { data: [] }
+            }
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`)
+            }
+            return res.json()
+        })
+}
+
+export function getTrefleRecommendations(trefleId) {
+    return fetch(`${API_BASE}/api/plants/${trefleId}/recommendations`)
+        .then(res => {
+            if (res.status === 404) {
+                return null
+            }
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`)
+            }
+            return res.json()
+        })
+}
