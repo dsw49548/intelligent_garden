@@ -21,6 +21,7 @@ function PlantDetails() {
     const [limit, setLimit] = useState(50)
     const [loadingMore, setLoadingMore] = useState(false)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const [lastUpdated, setLastUpdated] = useState(null)
     const loadMoreRef = useRef(null)
     const observerRef = useRef(null)
 
@@ -47,31 +48,36 @@ function PlantDetails() {
     }
 
     const loadMeasurement = () => {
-        const cached = getCachedLatest(id)
-        if (cached) {
-            setMeasurement(cached)
-            setStatus(calculateStatus(cached, plant?.thresholds))
-            setLoading(false)
-        }
-
         fetchLatestMeasurement(id)
             .then(data => {
                 if (data) {
                     setMeasurement(data)
                     saveCachedLatest(id, data)
                     setStatus(calculateStatus(data, plant?.thresholds))
+                    setLastUpdated(new Date())
+                } else {
+                    const cached = getCachedLatest(id)
+                    if (cached) {
+                        setMeasurement(cached)
+                        setStatus(calculateStatus(cached, plant?.thresholds))
+                    } else {
+                        setMeasurement(null)
+                        setStatus('NO DATA')
+                    }
+                    setLastUpdated(new Date())
+                }
+                setLoading(false)
+            })
+            .catch(() => {
+                const cached = getCachedLatest(id)
+                if (cached) {
+                    setMeasurement(cached)
+                    setStatus(calculateStatus(cached, plant?.thresholds))
                 } else {
                     setMeasurement(null)
                     setStatus('NO DATA')
                 }
                 setLoading(false)
-            })
-            .catch(() => {
-                if (!cached) {
-                    setMeasurement(null)
-                    setStatus('NO DATA')
-                    setLoading(false)
-                }
             })
     }
 
@@ -135,7 +141,7 @@ function PlantDetails() {
         }, 10000)
 
         return () => clearInterval(interval)
-    }, [plant, id])
+    }, [plant?.id, id])
 
     useEffect(() => {
         if (!loadMoreRef.current) return
@@ -267,7 +273,12 @@ function PlantDetails() {
                     <div className="plant_cover_gradient"></div>
                 </div>
             ) : (
-                <div className="plant_cover_placeholder"></div>
+                <div className="plant_cover_placeholder">
+                    <div className="plant_cover_placeholder_content">
+                        <span className="plant_cover_placeholder_icon">🌱</span>
+                        <span className="plant_cover_placeholder_text">No photo yet</span>
+                    </div>
+                </div>
             )}
 
             <div className="plant_details_content">
@@ -311,7 +322,14 @@ function PlantDetails() {
                 </div>
 
                 <div className="card">
-                    <h3 className="card_title">Latest measurement</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <h3 className="card_title" style={{ margin: 0 }}>Latest measurement</h3>
+                        {lastUpdated && (
+                            <span style={{ fontSize: '0.75rem', color: '#aaa' }}>
+                                Last updated: {lastUpdated.toLocaleTimeString()}
+                            </span>
+                        )}
+                    </div>
                     {measurement ? (
                         <div className="measurement_info">
                             <div className="kv">

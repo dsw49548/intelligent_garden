@@ -9,7 +9,8 @@ export function savePlants(plants) {
 
 export function getPlantById(id) {
   const plants = getPlants()
-  return plants.find(p => p.id === id) || null
+  const normalizedId = String(id)
+  return plants.find(p => String(p.id) === normalizedId) || null
 }
 
 export function addPlant(plantData) {

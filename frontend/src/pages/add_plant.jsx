@@ -11,6 +11,8 @@ function AddPlant() {
     const [selectedTrefle, setSelectedTrefle] = useState(null)
     const [thresholds, setThresholds] = useState(getDefaultThresholds())
     const [showThresholds, setShowThresholds] = useState(false)
+    const [searchLoading, setSearchLoading] = useState(false)
+    const [searchError, setSearchError] = useState(null)
     const fileInputRef = useRef(null)
     const searchTimeoutRef = useRef(null)
 
@@ -20,21 +22,31 @@ function AddPlant() {
         }
         searchTimeoutRef.current = setTimeout(() => {
             if (query.length >= 2) {
+                setSearchLoading(true)
+                setSearchError(null)
                 searchTreflePlants(query)
                     .then(result => {
-                        const filtered = (result.data || []).filter(plant => {
+                        const data = result.data || result.plants || []
+                        const filtered = data.filter(plant => {
+                            if (!plant) return false
                             const queryLower = query.toLowerCase()
                             const commonName = (plant.common_name || '').toLowerCase()
                             const scientificName = (plant.scientific_name || '').toLowerCase()
                             return commonName.startsWith(queryLower) || scientificName.startsWith(queryLower)
                         })
                         setSearchResults(filtered)
+                        setSearchLoading(false)
                     })
-                    .catch(() => {
+                    .catch((err) => {
+                        console.error('Trefle search error:', err)
+                        setSearchError('Search failed')
                         setSearchResults([])
+                        setSearchLoading(false)
                     })
             } else {
                 setSearchResults([])
+                setSearchLoading(false)
+                setSearchError(null)
             }
         }, 350)
     }, [])
@@ -48,20 +60,20 @@ function AddPlant() {
         setSelectedTrefle(plant)
         setName(plant.common_name || plant.scientific_name)
         setSearchResults([])
+        setSearchLoading(false)
+        setSearchError(null)
+        setShowThresholds(true)
 
         getTrefleRecommendations(plant.id)
             .then(result => {
                 if (result && result.recommendations) {
                     setThresholds(result.recommendations)
-                    setShowThresholds(true)
                 } else {
                     setThresholds(getDefaultThresholds())
-                    setShowThresholds(true)
                 }
             })
             .catch(() => {
                 setThresholds(getDefaultThresholds())
-                setShowThresholds(true)
             })
     }
 
@@ -153,7 +165,21 @@ function AddPlant() {
                         onChange={(e) => setName(e.target.value)}
                         required
                     />
-                    {searchResults.length > 0 && (
+                    {searchLoading && (
+                        <div className="search_results">
+                            <div className="search_result_item" style={{ color: '#aaa', fontStyle: 'italic' }}>
+                                Loading...
+                            </div>
+                        </div>
+                    )}
+                    {searchError && (
+                        <div className="search_results">
+                            <div className="search_result_item" style={{ color: '#ff6b6b' }}>
+                                Error: {searchError}
+                            </div>
+                        </div>
+                    )}
+                    {!searchLoading && !searchError && searchResults.length > 0 && (
                         <div className="search_results">
                             {searchResults.map(plant => (
                                 <div
@@ -166,9 +192,19 @@ function AddPlant() {
                                         {plant.scientific_name && plant.common_name && (
                                             <div className="search_result_scientific">{plant.scientific_name}</div>
                                         )}
+                                        {plant.family && (
+                                            <div className="search_result_scientific">{plant.family}</div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+                    {!searchLoading && !searchError && name.length >= 2 && searchResults.length === 0 && (
+                        <div className="search_results">
+                            <div className="search_result_item" style={{ color: '#aaa', fontStyle: 'italic' }}>
+                                No results found
+                            </div>
                         </div>
                     )}
                     {selectedTrefle && (
@@ -178,7 +214,7 @@ function AddPlant() {
                     )}
                 </div>
 
-                {showThresholds && (
+                {(showThresholds || selectedTrefle) && (
                     <div className="form_group">
                         <h3 className="card_subtitle" style={{ marginBottom: '1rem' }}>Thresholds</h3>
                         {renderThreshold('soil_moisture', 'Soil Moisture', '%')}
@@ -189,6 +225,7 @@ function AddPlant() {
                 )}
 
                 <div className="form_group">
+                    <label className="label">Photo (optional)</label>
                     <input
                         ref={fileInputRef}
                         type="file"
@@ -196,7 +233,7 @@ function AddPlant() {
                         style={{ display: 'none' }}
                         onChange={handlePhotoChange}
                     />
-                    <button type="button" className="btn_secondary" onClick={handleCameraClick}>
+                    <button type="button" className="btn_secondary" onClick={handleCameraClick} style={{ width: '100%', marginBottom: '1rem' }}>
                         {photo ? 'Change Photo' : 'Take Photo'}
                     </button>
                     {photo && (
@@ -205,10 +242,10 @@ function AddPlant() {
                 </div>
 
                 <div className="form_actions">
-                    <button type="button" className="btn_text" onClick={() => navigate('/')}>
+                    <button type="button" className="btn_secondary" onClick={() => navigate('/')} style={{ flex: 1 }}>
                         Cancel
                     </button>
-                    <button type="submit" className="btn_primary" disabled={!name.trim()}>
+                    <button type="submit" className="btn_primary" disabled={!name.trim()} style={{ flex: 1 }}>
                         Add Plant
                     </button>
                 </div>
