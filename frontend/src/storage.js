@@ -104,3 +104,38 @@ export function getLastMeasurements() {
 export function saveLastMeasurements(measurements) {
   localStorage.setItem('last_measurements', JSON.stringify(measurements))
 }
+
+export function getCachedLatest(plantId) {
+  const cache = getLastMeasurements()
+  return cache[plantId] || null
+}
+
+export function saveCachedLatest(plantId, measurement) {
+  const cache = getLastMeasurements()
+  cache[plantId] = measurement
+  saveLastMeasurements(cache)
+}
+
+export function calculateStatus(measurement, thresholds) {
+  if (!measurement) return 'NO DATA'
+  
+  const th = thresholds || getDefaultThresholds()
+  let outOfRange = 0
+  
+  if (measurement.soil_moisture < th.soil_moisture_min || measurement.soil_moisture > th.soil_moisture_max) {
+    outOfRange++
+  }
+  if (measurement.air_temp_c < th.air_temp_c_min || measurement.air_temp_c > th.air_temp_c_max) {
+    outOfRange++
+  }
+  if (measurement.air_humidity < th.air_humidity_min || measurement.air_humidity > th.air_humidity_max) {
+    outOfRange++
+  }
+  if (measurement.light_lux < th.light_lux_min || measurement.light_lux > th.light_lux_max) {
+    outOfRange++
+  }
+  
+  if (outOfRange === 0) return 'OK'
+  if (outOfRange === 1) return 'WARN'
+  return 'BAD'
+}

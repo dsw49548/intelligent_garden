@@ -534,6 +534,40 @@ body {
   color: #aaa;
 }
 
+.status_ok {
+  background: #2d5a2d;
+  color: #90ee90;
+}
+
+.status_warn {
+  background: #5a4d2d;
+  color: #ffd700;
+}
+
+.status_bad {
+  background: #5a2d2d;
+  color: #ff6b6b;
+}
+
+.measurement_info {
+  margin-top: 1.5rem;
+}
+
+.plant_header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.plant_thumbnail {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #4a4a4a;
+}
+
 @media (min-width: 768px) {
   .content {
     padding: 2rem;
