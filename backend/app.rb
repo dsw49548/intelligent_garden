@@ -93,9 +93,114 @@ def validate_measurement(data)
   nil
 end
 
+TREFLE_TOKEN = ENV['TREFLE_TOKEN'] || 'usr-Sq8_eSyJ7L86Uz2WPScANwgKMVQRbrpO0W7GGCC1_9w'
+TREFLE_BASE = 'https://trefle.io/api/v1'
+
+def fetch_trefle(path)
+  full_path = path.include?('?') ? path : path
+  uri = URI("#{TREFLE_BASE}#{full_path}")
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = true
+  http.read_timeout = 5
+  http.open_timeout = 5
+  
+  request_path = uri.path
+  request_path += "?#{uri.query}" if uri.query
+  request = Net::HTTP::Get.new(request_path)
+  request['Authorization'] = "Bearer #{TREFLE_TOKEN}"
+  
+  response = http.request(request)
+  
+  if response.code.to_i == 200
+    JSON.parse(response.body)
+  else
+    nil
+  end
+rescue => e
+  puts "Trefle error: #{e.message}"
+  nil
+end
+
+def map_recommendations(trefle_data)
+  return get_default_recommendations unless trefle_data
+  
+  data = trefle_data.is_a?(Hash) ? trefle_data : trefle_data['data']
+  return get_default_recommendations unless data
+  
+  light = data['light'] || 0
+  temp_min = data['temperature_minimum'] || data['temperature_min'] || 18
+  temp_max = data['temperature_maximum'] || data['temperature_max'] || 28
+  
+  {
+    soil_moisture_min: 30,
+    soil_moisture_max: 70,
+    air_temp_c_min: temp_min.to_f,
+    air_temp_c_max: temp_max.to_f,
+    air_humidity_min: 40,
+    air_humidity_max: 70,
+    light_lux_min: light > 0 ? (light * 100).to_i : 500,
+    light_lux_max: light > 0 ? (light * 1000).to_i : 5000
+  }
+end
+
+def get_default_recommendations
+  {
+    soil_moisture_min: 30,
+    soil_moisture_max: 70,
+    air_temp_c_min: 18,
+    air_temp_c_max: 28,
+    air_humidity_min: 40,
+    air_humidity_max: 70,
+    light_lux_min: 500,
+    light_lux_max: 5000
+  }
+end
+
 get '/health' do
   content_type :json
   { status: 'ok' }.to_json
+end
+
+get '/api/plants/search' do
+  content_type :json
+  
+  query = params['q']
+  unless query && query.length >= 2
+    status 400
+    return { error: 'query too short (min 2 chars)' }.to_json
+  end
+  
+  result = fetch_trefle("/plants/search?q=#{URI.encode_www_form_component(query)}")
+  
+  if result && result['data']
+    plants = result['data'].map do |plant|
+      {
+        id: plant['id'],
+        scientific_name: plant['scientific_name'],
+        common_name: plant['common_name'],
+        slug: plant['slug']
+      }
+    end
+    { data: plants }.to_json
+  else
+    status 404
+    { error: 'not found' }.to_json
+  end
+end
+
+get '/api/plants/:id/recommendations' do
+  content_type :json
+  
+  trefle_id = params['id']
+  result = fetch_trefle("/plants/#{trefle_id}")
+  
+  if result
+    recommendations = map_recommendations(result)
+    { recommendations: recommendations }.to_json
+  else
+    status 404
+    { error: 'not found' }.to_json
+  end
 end
 
 post '/api/measurements' do
@@ -204,106 +309,4 @@ get '/api/measurements' do
     end
 
   records.to_json
-end
-
-TREFLE_TOKEN = ENV['TREFLE_TOKEN'] || 'usr-Sq8_eSyJ7L86Uz2WPScANwgKMVQRbrpO0W7GGCC1_9w'
-TREFLE_BASE = 'https://trefle.io/api/v1'
-
-def fetch_trefle(path)
-  uri = URI("#{TREFLE_BASE}#{path}")
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-  http.read_timeout = 5
-  http.open_timeout = 5
-  
-  request = Net::HTTP::Get.new(uri.path)
-  request['Authorization'] = "Bearer #{TREFLE_TOKEN}"
-  
-  response = http.request(request)
-  
-  if response.code.to_i == 200
-    JSON.parse(response.body)
-  else
-    nil
-  end
-rescue => e
-  puts "Trefle error: #{e.message}"
-  nil
-end
-
-def map_recommendations(trefle_data)
-  return get_default_recommendations unless trefle_data
-  
-  data = trefle_data.is_a?(Hash) ? trefle_data : trefle_data['data']
-  return get_default_recommendations unless data
-  
-  light = data['light'] || 0
-  temp_min = data['temperature_minimum'] || data['temperature_min'] || 18
-  temp_max = data['temperature_maximum'] || data['temperature_max'] || 28
-  
-  {
-    soil_moisture_min: 30,
-    soil_moisture_max: 70,
-    air_temp_c_min: temp_min.to_f,
-    air_temp_c_max: temp_max.to_f,
-    air_humidity_min: 40,
-    air_humidity_max: 70,
-    light_lux_min: light > 0 ? (light * 100).to_i : 500,
-    light_lux_max: light > 0 ? (light * 1000).to_i : 5000
-  }
-end
-
-def get_default_recommendations
-  {
-    soil_moisture_min: 30,
-    soil_moisture_max: 70,
-    air_temp_c_min: 18,
-    air_temp_c_max: 28,
-    air_humidity_min: 40,
-    air_humidity_max: 70,
-    light_lux_min: 500,
-    light_lux_max: 5000
-  }
-end
-
-get '/api/plants/search' do
-  content_type :json
-  
-  query = params['q']
-  unless query && query.length >= 2
-    status 400
-    return { error: 'query too short (min 2 chars)' }.to_json
-  end
-  
-  result = fetch_trefle("/plants/search?q=#{URI.encode_www_form_component(query)}")
-  
-  if result && result['data']
-    plants = result['data'].map do |plant|
-      {
-        id: plant['id'],
-        scientific_name: plant['scientific_name'],
-        common_name: plant['common_name'],
-        slug: plant['slug']
-      }
-    end
-    { data: plants }.to_json
-  else
-    status 404
-    { error: 'not found' }.to_json
-  end
-end
-
-get '/api/plants/:id/recommendations' do
-  content_type :json
-  
-  trefle_id = params['id']
-  result = fetch_trefle("/plants/#{trefle_id}")
-  
-  if result
-    recommendations = map_recommendations(result)
-    { recommendations: recommendations }.to_json
-  else
-    status 404
-    { error: 'not found' }.to_json
-  end
 end
