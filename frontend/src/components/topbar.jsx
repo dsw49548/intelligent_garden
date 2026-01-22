@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import Drawer from './drawer.jsx'
 
 function Topbar({ onMenuClick }) {
@@ -18,9 +19,11 @@ function Topbar({ onMenuClick }) {
                 <button className="menu_button" onClick={handleMenuClick} aria-label="Open menu">
                     ☰
                 </button>
-                <h1>Intelligent Garden</h1>
+                <Link to="/" className="top_bar_title_link">
+                    <h1>Intelligent Garden</h1>
+                </Link>
             </header>
-            <Drawer isOpen={drawerOpen} onClose={handleDrawerClose} />
+            <Drawer isOpen={drawerOpen} onClose={handleDrawerClose} onOpen={handleMenuClick} />
         </>
     )
 }

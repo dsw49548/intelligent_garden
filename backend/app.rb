@@ -9,8 +9,8 @@ require_relative 'lib/trefle_client'
 
 use Rack::Cors do
   allow do
-    origins 'http://localhost:5173'
-    resource '/api/*', headers: 'Content-Type', methods: [:get, :post, :options]
+    origins 'http://localhost:5173', 'http://localhost:4173', 'http://127.0.0.1:4173', 'http://127.0.0.1:5173'
+    resource '/api/*', headers: 'Content-Type', methods: [:get, :post, :delete, :options]
   end
 end
 
@@ -393,4 +393,20 @@ get '/api/measurements' do
     end
 
   records.to_json
+end
+
+delete '/api/measurements' do
+  content_type :json
+  
+  begin
+    count_before = DB[:measurements].count
+    DB.run("DELETE FROM measurements")
+    count_after = DB[:measurements].count
+    puts "DELETE /api/measurements: deleted #{count_before} measurements, remaining: #{count_after}"
+    { status: 'ok', message: 'All measurements deleted', deleted: count_before, remaining: count_after }.to_json
+  rescue => e
+    puts "DELETE /api/measurements error: #{e.class} #{e.message}"
+    status 500
+    { error: e.message }.to_json
+  end
 end

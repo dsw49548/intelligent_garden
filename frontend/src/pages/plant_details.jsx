@@ -4,6 +4,8 @@ import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
 import { getPlantById, getCachedLatest, saveCachedLatest, calculateStatus, getCachedHistory, saveCachedHistory, updatePlant, deletePlant } from '../storage.js'
 import { fetchLatestMeasurement, fetchMeasurements, fetchTreflePlantDetails } from '../api.js'
+import { loadPlantPhoto } from '../utils/photo_loader.js'
+import { useApp } from '../contexts/app_context.jsx'
 import BottomSheet from '../components/bottom_sheet.jsx'
 import PlantSettings from '../components/plant_settings.jsx'
 
@@ -22,16 +24,20 @@ function PlantDetails() {
     const [loadingMore, setLoadingMore] = useState(false)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [lastUpdated, setLastUpdated] = useState(null)
+    const [coverImage, setCoverImage] = useState(null)
     const loadMoreRef = useRef(null)
     const observerRef = useRef(null)
 
-    const loadPlant = () => {
+    const loadPlant = async () => {
         const foundPlant = getPlantById(id)
         if (!foundPlant) {
             setLoading(false)
             return
         }
         setPlant(foundPlant)
+
+        const photo = await loadPlantPhoto(foundPlant)
+        setCoverImage(photo || (foundPlant.trefle && foundPlant.trefle.image_url) || null)
 
         if (foundPlant.trefle && foundPlant.trefle.id) {
             fetchTreflePlantDetails(foundPlant.trefle.id)
@@ -41,6 +47,9 @@ function PlantDetails() {
                         const mergedTrefle = { ...foundPlant.trefle, ...data }
                         updatePlant(id, { trefle: mergedTrefle })
                         setPlant({ ...foundPlant, trefle: mergedTrefle })
+                        if (!photo && data.image_url) {
+                            setCoverImage(data.image_url)
+                        }
                     }
                 })
                 .catch(() => { })
@@ -137,11 +146,30 @@ function PlantDetails() {
         loadHistory()
 
         const interval = setInterval(() => {
-            loadMeasurement()
-        }, 10000)
+            fetchLatestMeasurement(id)
+                .then(data => {
+                    if (data) {
+                        const currentMeasurement = getCachedLatest(id)
+                        const currentTimestamp = currentMeasurement ? new Date(currentMeasurement.measured_at).getTime() : 0
+                        const newTimestamp = new Date(data.measured_at).getTime()
+                        if (newTimestamp > currentTimestamp) {
+                            loadMeasurement()
+                            loadHistory()
+                        }
+                    } else {
+                        const cached = getCachedLatest(id)
+                        if (!cached) {
+                            loadMeasurement()
+                        }
+                    }
+                })
+                .catch(() => {
+                    // Silently fail, keep current data
+                })
+        }, 2500)
 
         return () => clearInterval(interval)
-    }, [plant?.id, id])
+    }, [plant?.id, plant?.thresholds, id])
 
     useEffect(() => {
         if (!loadMoreRef.current) return
@@ -167,14 +195,28 @@ function PlantDetails() {
     const handlePlantUpdate = (updatedPlant) => {
         setPlant(updatedPlant)
         setIsSettingsOpen(false)
-        loadMeasurement()
+
+        // Recalculate status immediately with new thresholds
+        if (measurement) {
+            const newStatus = calculateStatus(measurement, updatedPlant.thresholds)
+            setStatus(newStatus)
+        } else {
+            loadMeasurement()
+        }
     }
 
+    const { showConfirm, showToast } = useApp()
+
     const handlePlantDelete = () => {
-        if (window.confirm('Are you sure you want to delete this plant?')) {
-            deletePlant(id)
-            navigate('/')
-        }
+        showConfirm(
+            'Delete this plant?',
+            'This action cannot be undone.',
+            async () => {
+                await deletePlant(id)
+                showToast('Plant deleted', 'success')
+                navigate('/')
+            }
+        )
     }
 
     if (loading && !plant) {
@@ -205,9 +247,13 @@ function PlantDetails() {
     }
 
     const statusClass = status === 'NO DATA' ? 'status_nodata' : `status_${status.toLowerCase()}`
-
-    const coverImage = plant.photo || (trefleData && trefleData.image_url) || (plant.trefle && plant.trefle.image_url) || null
-    const commonName = (trefleData && trefleData.common_name) || (plant.trefle && plant.trefle.common_name) || plant.name
+    const getDisplayName = () => {
+        if (plant.displayName && plant.displayName.trim().length > 0) {
+            return plant.displayName.trim()
+        }
+        return (trefleData && trefleData.common_name) || (plant.trefle && plant.trefle.common_name) || plant.name
+    }
+    const commonName = getDisplayName()
     const scientificName = (trefleData && trefleData.scientific_name) || (plant.trefle && plant.trefle.scientific_name) || null
     const family = (trefleData && trefleData.family) || (plant.trefle && plant.trefle.family) || null
     const familyCommonName = (trefleData && trefleData.family_common_name) || (plant.trefle && plant.trefle.family_common_name) || null
@@ -265,19 +311,14 @@ function PlantDetails() {
         ]
     }
 
+    const hasCover = Boolean(coverImage)
+
     return (
         <div className="plant_details_page">
-            {coverImage ? (
+            {hasCover && (
                 <div className="plant_cover_container">
                     <img src={coverImage} alt={commonName} className="plant_cover_image" />
                     <div className="plant_cover_gradient"></div>
-                </div>
-            ) : (
-                <div className="plant_cover_placeholder">
-                    <div className="plant_cover_placeholder_content">
-                        <span className="plant_cover_placeholder_icon">🌱</span>
-                        <span className="plant_cover_placeholder_text">No photo yet</span>
-                    </div>
                 </div>
             )}
 
@@ -315,21 +356,18 @@ function PlantDetails() {
                     </div>
                 )}
 
-                <div className="plant_status_section">
-                    <span className={`status_badge ${statusClass}`}>
-                        Status: {statusEmoji[status]} {status}
-                    </span>
-                </div>
-
                 <div className="card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <div className="latest_header_row">
                         <h3 className="card_title" style={{ margin: 0 }}>Latest measurement</h3>
-                        {lastUpdated && (
-                            <span style={{ fontSize: '0.75rem', color: '#aaa' }}>
-                                Last updated: {lastUpdated.toLocaleTimeString()}
-                            </span>
-                        )}
+                        <span className={`status_badge ${statusClass}`}>
+                            {statusEmoji[status]} {status}
+                        </span>
                     </div>
+                    {lastUpdated && (
+                        <div className="last_updated_text">
+                            Last updated: {lastUpdated.toLocaleTimeString()}
+                        </div>
+                    )}
                     {measurement ? (
                         <div className="measurement_info">
                             <div className="kv">
