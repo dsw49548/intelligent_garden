@@ -94,3 +94,8 @@ temp/
 .parcel-cache/
 .vite/
 *.cache
+
+# Firmware (PlatformIO)
+firmware/src/config.h
+firmware/.pio/
+firmware/.vscode/
