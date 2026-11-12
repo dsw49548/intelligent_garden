@@ -227,10 +227,11 @@ get '/api/plants/search' do
     return { error: 'query too short (min 2 chars)' }.to_json
   end
   
-  result = fetch_trefle("/plants/search?q=#{CGI.escape(query)}")
+  result = fetch_trefle("/plants/search?q=#{CGI.escape(query)}&limit=100")
   
   if result && result['data']
-    plants = result['data'].first(15).map do |plant|
+    q = query.downcase.strip
+    plants = result['data'].first(100).map do |plant|
       {
         id: plant['id'],
         scientific_name: plant['scientific_name'],
@@ -242,7 +243,22 @@ get '/api/plants/search' do
         slug: plant['slug']
       }
     end
-    { data: plants }.to_json
+    plants.sort_by! do |p|
+      cn = (p[:common_name] || '').downcase
+      sn = (p[:scientific_name] || '').downcase
+      if cn.start_with?(q)
+        [0, cn]
+      elsif sn.start_with?(q)
+        [1, sn]
+      elsif cn.include?(q)
+        [2, cn]
+      elsif sn.include?(q)
+        [3, sn]
+      else
+        [4, cn]
+      end
+    end
+    { data: plants.first(15) }.to_json
   else
     status 404
     { error: 'not found' }.to_json
