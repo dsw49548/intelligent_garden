@@ -12,3 +12,8 @@
 
 #define SOIL_WET_RAW  1500
 #define SOIL_DRY_RAW  2400
+
+// Pompka przez przekaznik (modul JQC3F-05VDC-C, zworka H/L na H)
+#define PUMP_PIN         23     // GPIO -> wejscie IN przekaznika
+#define PUMP_ACTIVE_HIGH 1      // 1: HIGH = pompa pracuje, 0: LOW = pompa pracuje
+#define PUMP_MAX_RUN_MS  10000  // twardy limit pojedynczej pracy pompy [ms]
