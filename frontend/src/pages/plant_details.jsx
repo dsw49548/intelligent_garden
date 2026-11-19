@@ -78,6 +78,10 @@ function PlantDetails() {
         setIsSettingsOpen(false)
     }
 
+    const handlePhotoChange = async () => {
+        setCoverImage(await loadPlantPhoto(plant))
+    }
+
     const handleMeasurementsCleared = () => {
         setIsSettingsOpen(false)
         setMeasurement(null)
@@ -331,6 +335,7 @@ function PlantDetails() {
                     onSave={handlePlantUpdate}
                     onDelete={handlePlantDelete}
                     onCleared={handleMeasurementsCleared}
+                    onPhotoChange={handlePhotoChange}
                     onClose={() => setIsSettingsOpen(false)}
                 />
             </BottomSheet>

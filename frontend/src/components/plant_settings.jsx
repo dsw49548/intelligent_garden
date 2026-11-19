@@ -1,14 +1,16 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { updatePlant, clearPlantMeasurements } from '../api.js'
+import { savePhoto, deletePhoto, compressImage } from '../storage_photos.js'
 import { useApp } from '../contexts/app_context.jsx'
 
 const THRESHOLD_KEYS = ['soil_min', 'soil_max', 'temp_min', 'temp_max', 'hum_min', 'hum_max', 'light_min', 'light_max']
 
-function PlantSettings({ plant, onSave, onDelete, onCleared, onClose }) {
+function PlantSettings({ plant, onSave, onDelete, onCleared, onClose, onPhotoChange }) {
     const { showConfirm, showToast } = useApp()
     const [thresholds, setThresholds] = useState(() => Object.fromEntries(THRESHOLD_KEYS.map(k => [k, plant[k]])))
     const [name, setName] = useState(plant.name)
     const [errors, setErrors] = useState({})
+    const fileInputRef = useRef(null)
 
     const validateThreshold = (key, min, max) => {
         const range = getRange(key)
@@ -102,6 +104,30 @@ function PlantSettings({ plant, onSave, onDelete, onCleared, onClose }) {
         )
     }
 
+    const handlePhotoFile = async (e) => {
+        const file = e.target.files[0]
+        e.target.value = ''
+        if (!file) return
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Error: Photo is too large. Maximum size is 5 MB.', 'error')
+            return
+        }
+        try {
+            const compressed = await compressImage(file)
+            await savePhoto(plant.id, compressed)
+            showToast('Photo changed', 'success')
+            onPhotoChange()
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error')
+        }
+    }
+
+    const handleRemovePhoto = async () => {
+        await deletePhoto(plant.id)
+        showToast('Photo removed', 'success')
+        onPhotoChange()
+    }
+
     const getRange = (key) => {
         const ranges = {
             soil: { min: 0, max: 100 },
@@ -174,6 +200,22 @@ function PlantSettings({ plant, onSave, onDelete, onCleared, onClose }) {
                     <div style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '0.25rem' }}>
                         {name.length}/50 characters
                     </div>
+                </div>
+                <h3>Photo</h3>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handlePhotoFile}
+                />
+                <div className="photo_buttons_row" style={{ marginBottom: '1.5rem' }}>
+                    <button className="btn_secondary" onClick={() => fileInputRef.current.click()}>
+                        Change photo
+                    </button>
+                    <button className="btn_text" onClick={handleRemovePhoto}>
+                        Remove photo
+                    </button>
                 </div>
                 <h3>Thresholds</h3>
                 {renderThreshold('soil', 'Soil Moisture', '%')}

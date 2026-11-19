@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDefaultThresholds } from '../storage.js'
 import { createPlant, searchTreflePlants, getTrefleRecommendations } from '../api.js'
-import { savePhoto } from '../storage_photos.js'
+import { savePhoto, deletePhoto, compressImage } from '../storage_photos.js'
 
 function AddPlant() {
     const navigate = useNavigate()
@@ -26,7 +26,7 @@ function AddPlant() {
             clearTimeout(searchTimeoutRef.current)
         }
         searchTimeoutRef.current = setTimeout(() => {
-            if (searchQuery.length >= 2 && selectedTrefle === null) {
+            if (searchQuery.length >= 3 && selectedTrefle === null) {
                 setSearchLoading(true)
                 setSearchError(null)
                 searchTreflePlants(searchQuery)
@@ -52,7 +52,7 @@ function AddPlant() {
                 setSearchLoading(false)
                 setSearchError(null)
             }
-        }, 300)
+        }, 400)
     }, [selectedTrefle])
 
     useEffect(() => {
@@ -123,50 +123,6 @@ function AddPlant() {
                 newThresholds[maxKey] = clampedValue
             }
             return newThresholds
-        })
-    }
-
-    const compressImage = (file, maxWidth = 1280, quality = 0.7) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = (e) => {
-                const img = new Image()
-                img.onload = () => {
-                    const canvas = document.createElement('canvas')
-                    let width = img.width
-                    let height = img.height
-
-                    if (width > maxWidth) {
-                        height = (height * maxWidth) / width
-                        width = maxWidth
-                    }
-
-                    canvas.width = width
-                    canvas.height = height
-                    const ctx = canvas.getContext('2d')
-                    ctx.drawImage(img, 0, 0, width, height)
-
-                    canvas.toBlob((blob) => {
-                        if (!blob) {
-                            reject(new Error('Compression failed'))
-                            return
-                        }
-                        const maxSize = 5 * 1024 * 1024
-                        if (blob.size > maxSize) {
-                            reject(new Error('Photo is too large after compression. Maximum size is 5 MB.'))
-                            return
-                        }
-                        const reader2 = new FileReader()
-                        reader2.onload = () => resolve(reader2.result)
-                        reader2.onerror = () => reject(new Error('Failed to read compressed photo'))
-                        reader2.readAsDataURL(blob)
-                    }, 'image/jpeg', quality)
-                }
-                img.onerror = () => reject(new Error('Failed to load image'))
-                img.src = e.target.result
-            }
-            reader.onerror = () => reject(new Error('Failed to read file'))
-            reader.readAsDataURL(file)
         })
     }
 
@@ -247,6 +203,7 @@ function AddPlant() {
                 image_url: selectedTrefle ? selectedTrefle.image_url : null,
                 ...thresholds
             })
+            await deletePhoto(plant.id)
             if (photo) {
                 await savePhoto(plant.id, photo)
             }
@@ -320,7 +277,7 @@ function AddPlant() {
                         }}
                         required
                     />
-                    {selectedTrefle === null && (searchLoading || searchError || searchResults.length > 0 || (query.length >= 2 && searchResults.length === 0 && !searchLoading && !searchError)) && (
+                    {selectedTrefle === null && (searchLoading || searchError || searchResults.length > 0 || (query.length >= 3 && searchResults.length === 0 && !searchLoading && !searchError)) && (
                         <div className="search_results_dropdown">
                             {searchLoading && (
                                 <div className="search_result_item" style={{ color: '#aaa', fontStyle: 'italic' }}>
@@ -352,9 +309,9 @@ function AddPlant() {
                                     </div>
                                 ))
                             )}
-                            {!searchLoading && !searchError && query.length >= 2 && searchResults.length === 0 && (
+                            {!searchLoading && !searchError && query.length >= 3 && searchResults.length === 0 && (
                                 <div className="search_result_item" style={{ color: '#aaa', fontStyle: 'italic' }}>
-                                    No results found
+                                    No matches - try the full name, e.g. monstera
                                 </div>
                             )}
                         </div>
