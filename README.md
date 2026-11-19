@@ -126,6 +126,8 @@ Inne komendy: `mode <stable|daynight|dryout|randomwalk>`, `interval <s>`, `statu
 ## Struktura projektu
 
 - `backend/` - API Sinatra + SQLite + Fake IoT CLI generator (`fake_iot.rb`)
-  - Endpointy API: `/health`, `/api/measurements`, `/api/measurements/latest`, `/api/measurements?plant_id=X&limit=Y`
-  - Endpointy Trefle proxy: `/api/plants/search?q=QUERY`, `/api/plants/:id`, `/api/plants/ping`
+  - Konta: `/api/register`, `/api/login`, `/api/logout`, `/api/me` (token w nagłówku `Authorization: Bearer <token>`)
+  - Rośliny (wymagają logowania): `/api/plants`, `/api/plants/:id`, `/api/plants/:id/measurements`
+  - Pomiary: `POST /api/measurements` (bez logowania, ESP32), `GET /api/measurements/latest`, `GET /api/measurements?plant_id=X&limit=Y` (wymagają logowania)
+  - Trefle proxy (wymaga logowania): `/api/trefle/search?q=QUERY`, `/api/trefle/:id`, `/api/trefle/:id/recommendations`
 - `frontend/` - React PWA (Vite + React Router + Chart.js)
