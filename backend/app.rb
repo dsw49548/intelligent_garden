@@ -384,6 +384,9 @@ get '/api/trefle/search' do
         slug: plant['slug']
       }
     end
+    plants.select! do |p|
+      (p[:common_name] || '').downcase.include?(q) || (p[:scientific_name] || '').downcase.include?(q)
+    end
     plants.sort_by! do |p|
       cn = (p[:common_name] || '').downcase
       sn = (p[:scientific_name] || '').downcase
