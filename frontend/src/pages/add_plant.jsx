@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { addPlant, getDefaultThresholds } from '../storage.js'
-import { searchTreflePlants, getTrefleRecommendations } from '../api.js'
+import { getDefaultThresholds } from '../storage.js'
+import { createPlant, searchTreflePlants, getTrefleRecommendations } from '../api.js'
+import { savePhoto } from '../storage_photos.js'
 
 function AddPlant() {
     const navigate = useNavigate()
@@ -92,10 +93,10 @@ function AddPlant() {
 
     const getRange = (key) => {
         const ranges = {
-            soil_moisture: { min: 0, max: 100 },
-            air_temp_c: { min: -10, max: 50 },
-            air_humidity: { min: 0, max: 100 },
-            light_lux: { min: 0, max: 20000 }
+            soil: { min: 0, max: 100 },
+            temp: { min: -10, max: 50 },
+            hum: { min: 0, max: 100 },
+            light: { min: 0, max: 20000 }
         }
         return ranges[key] || { min: 0, max: 100 }
     }
@@ -239,12 +240,16 @@ function AddPlant() {
         setSubmitError(null)
 
         try {
-            await addPlant({
+            const plant = await createPlant({
                 name: plantName,
-                photo: photo,
-                trefle: selectedTrefle,
-                thresholds: thresholds
+                scientific_name: selectedTrefle ? selectedTrefle.scientific_name : null,
+                trefle_id: selectedTrefle ? selectedTrefle.id : null,
+                image_url: selectedTrefle ? selectedTrefle.image_url : null,
+                ...thresholds
             })
+            if (photo) {
+                await savePhoto(plant.id, photo)
+            }
             navigate('/')
         } catch (err) {
             setSubmitError(err.message || 'Failed to add plant')
@@ -364,10 +369,10 @@ function AddPlant() {
                 {name.length > 0 && (
                     <div className="form_group">
                         <h3 className="card_subtitle" style={{ marginBottom: '1rem' }}>Plant thresholds</h3>
-                        {renderThreshold('soil_moisture', 'Soil Moisture', '%')}
-                        {renderThreshold('air_temp_c', 'Air Temperature', '°C')}
-                        {renderThreshold('air_humidity', 'Air Humidity', '%')}
-                        {renderThreshold('light_lux', 'Light', 'lux')}
+                        {renderThreshold('soil', 'Soil Moisture', '%')}
+                        {renderThreshold('temp', 'Air Temperature', '°C')}
+                        {renderThreshold('hum', 'Air Humidity', '%')}
+                        {renderThreshold('light', 'Light', 'lux')}
                     </div>
                 )}
 

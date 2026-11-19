@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Drawer from './drawer.jsx'
+import { getToken } from '../storage.js'
 
 function Topbar({ onMenuClick }) {
     const [drawerOpen, setDrawerOpen] = useState(false)
@@ -16,14 +17,16 @@ function Topbar({ onMenuClick }) {
     return (
         <>
             <header className="top_bar">
-                <button className="menu_button" onClick={handleMenuClick} aria-label="Open menu">
-                    ☰
-                </button>
+                {getToken() && (
+                    <button className="menu_button" onClick={handleMenuClick} aria-label="Open menu">
+                        ☰
+                    </button>
+                )}
                 <Link to="/" className="top_bar_title_link">
                     <h1>Intelligent Garden</h1>
                 </Link>
             </header>
-            <Drawer isOpen={drawerOpen} onClose={handleDrawerClose} onOpen={handleMenuClick} />
+            {getToken() && <Drawer isOpen={drawerOpen} onClose={handleDrawerClose} onOpen={handleMenuClick} />}
         </>
     )
 }

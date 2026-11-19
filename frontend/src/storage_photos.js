@@ -71,19 +71,3 @@ export async function deletePhoto(plantId) {
     return false
   }
 }
-
-export async function clearAllPhotos() {
-  try {
-    const db = await openDB()
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite')
-      const store = tx.objectStore(STORE_NAME)
-      const request = store.clear()
-      request.onsuccess = () => resolve(true)
-      request.onerror = () => reject(request.error)
-      tx.onerror = () => reject(tx.error)
-    })
-  } catch (err) {
-    return false
-  }
-}

@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
-import { getPlantById, getCachedLatest, saveCachedLatest, calculateStatus, getCachedHistory, saveCachedHistory, updatePlant, deletePlant } from '../storage.js'
-import { fetchLatestMeasurement, fetchMeasurements, fetchTreflePlantDetails } from '../api.js'
+import { calculateStatus } from '../storage.js'
+import { getPlant, deletePlant, fetchLatestMeasurement, fetchMeasurements, fetchTreflePlantDetails } from '../api.js'
+import { deletePhoto } from '../storage_photos.js'
 import { loadPlantPhoto } from '../utils/photo_loader.js'
 import { useApp } from '../contexts/app_context.jsx'
 import BottomSheet from '../components/bottom_sheet.jsx'
@@ -19,190 +20,68 @@ function PlantDetails() {
     const [measurement, setMeasurement] = useState(null)
     const [history, setHistory] = useState([])
     const [loading, setLoading] = useState(true)
-    const [status, setStatus] = useState('NO DATA')
     const [limit, setLimit] = useState(50)
-    const [loadingMore, setLoadingMore] = useState(false)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [lastUpdated, setLastUpdated] = useState(null)
     const [coverImage, setCoverImage] = useState(null)
     const loadMoreRef = useRef(null)
-    const observerRef = useRef(null)
-
-    const loadPlant = async () => {
-        const foundPlant = getPlantById(id)
-        if (!foundPlant) {
-            setLoading(false)
-            return
-        }
-        setPlant(foundPlant)
-
-        const photo = await loadPlantPhoto(foundPlant)
-        setCoverImage(photo || (foundPlant.trefle && foundPlant.trefle.image_url) || null)
-
-        if (foundPlant.trefle && foundPlant.trefle.id) {
-            fetchTreflePlantDetails(foundPlant.trefle.id)
-                .then(data => {
-                    if (data) {
-                        setTrefleData(data)
-                        const mergedTrefle = { ...foundPlant.trefle, ...data }
-                        updatePlant(id, { trefle: mergedTrefle })
-                        setPlant({ ...foundPlant, trefle: mergedTrefle })
-                        if (!photo && data.image_url) {
-                            setCoverImage(data.image_url)
-                        }
-                    }
-                })
-                .catch(() => { })
-        }
-    }
-
-    const loadMeasurement = () => {
-        fetchLatestMeasurement(id)
-            .then(data => {
-                if (data) {
-                    setMeasurement(data)
-                    saveCachedLatest(id, data)
-                    setStatus(calculateStatus(data, plant?.thresholds))
-                    setLastUpdated(new Date())
-                } else {
-                    const cached = getCachedLatest(id)
-                    if (cached) {
-                        setMeasurement(cached)
-                        setStatus(calculateStatus(cached, plant?.thresholds))
-                    } else {
-                        setMeasurement(null)
-                        setStatus('NO DATA')
-                    }
-                    setLastUpdated(new Date())
-                }
-                setLoading(false)
-            })
-            .catch(() => {
-                const cached = getCachedLatest(id)
-                if (cached) {
-                    setMeasurement(cached)
-                    setStatus(calculateStatus(cached, plant?.thresholds))
-                } else {
-                    setMeasurement(null)
-                    setStatus('NO DATA')
-                }
-                setLoading(false)
-            })
-    }
-
-    const loadHistory = (currentLimit = limit) => {
-        const cached = getCachedHistory(id)
-        if (cached && cached.length > 0) {
-            setHistory(cached)
-        }
-
-        fetchMeasurements(id, currentLimit)
-            .then(data => {
-                if (data && data.length > 0) {
-                    const sorted = [...data].sort((a, b) => new Date(b.measured_at) - new Date(a.measured_at))
-                    const unique = sorted.filter((m, idx, arr) => arr.findIndex(x => x.id === m.id) === idx)
-                    setHistory(unique)
-                    saveCachedHistory(id, unique)
-                } else {
-                    setHistory([])
-                }
-            })
-            .catch(() => {
-                if (!cached || cached.length === 0) {
-                    setHistory([])
-                }
-            })
-    }
-
-    const loadMore = () => {
-        if (loadingMore) return
-        setLoadingMore(true)
-        const newLimit = limit + 50
-        setLimit(newLimit)
-
-        fetchMeasurements(id, newLimit)
-            .then(data => {
-                if (data && data.length > 0) {
-                    const sorted = [...data].sort((a, b) => new Date(b.measured_at) - new Date(a.measured_at))
-                    const unique = sorted.filter((m, idx, arr) => arr.findIndex(x => x.id === m.id) === idx)
-                    setHistory(unique)
-                    saveCachedHistory(id, unique)
-                }
-                setLoadingMore(false)
-            })
-            .catch(() => {
-                setLoadingMore(false)
-            })
-    }
 
     useEffect(() => {
-        loadPlant()
+        getPlant(id)
+            .then(async (foundPlant) => {
+                setPlant(foundPlant)
+                setLoading(false)
+                if (!foundPlant) return
+                setCoverImage(await loadPlantPhoto(foundPlant))
+                if (foundPlant.trefle_id) {
+                    fetchTreflePlantDetails(foundPlant.trefle_id).then(setTrefleData)
+                }
+            })
+            .catch(() => setLoading(false))
     }, [id])
+
+    const loadMeasurements = () => {
+        fetchLatestMeasurement(id)
+            .then(data => {
+                setMeasurement(data)
+                setLastUpdated(new Date())
+            })
+            .catch(() => {})
+        fetchMeasurements(id, limit)
+            .then(setHistory)
+            .catch(() => {})
+    }
 
     useEffect(() => {
         if (!plant) return
-
-        loadMeasurement()
-        loadHistory()
-
-        const interval = setInterval(() => {
-            fetchLatestMeasurement(id)
-                .then(data => {
-                    if (data) {
-                        const currentMeasurement = getCachedLatest(id)
-                        const currentTimestamp = currentMeasurement ? new Date(currentMeasurement.measured_at).getTime() : 0
-                        const newTimestamp = new Date(data.measured_at).getTime()
-                        if (newTimestamp > currentTimestamp) {
-                            loadMeasurement()
-                            loadHistory()
-                        }
-                    } else {
-                        const cached = getCachedLatest(id)
-                        if (!cached) {
-                            loadMeasurement()
-                        }
-                    }
-                })
-                .catch(() => {
-                    // Silently fail, keep current data
-                })
-        }, 2500)
-
+        loadMeasurements()
+        const interval = setInterval(loadMeasurements, 5000)
         return () => clearInterval(interval)
-    }, [plant?.id, plant?.thresholds, id])
+    }, [plant?.id, limit])
 
     useEffect(() => {
         if (!loadMoreRef.current) return
-
-        observerRef.current = new IntersectionObserver(
+        const observer = new IntersectionObserver(
             (entries) => {
-                if (entries[0].isIntersecting && !loadingMore) {
-                    loadMore()
+                if (entries[0].isIntersecting && history.length >= limit && limit < 500) {
+                    setLimit(limit + 50)
                 }
             },
             { threshold: 1.0 }
         )
-
-        observerRef.current.observe(loadMoreRef.current)
-
-        return () => {
-            if (observerRef.current) {
-                observerRef.current.disconnect()
-            }
-        }
-    }, [loadingMore])
+        observer.observe(loadMoreRef.current)
+        return () => observer.disconnect()
+    }, [history.length, limit])
 
     const handlePlantUpdate = (updatedPlant) => {
         setPlant(updatedPlant)
         setIsSettingsOpen(false)
+    }
 
-        // Recalculate status immediately with new thresholds
-        if (measurement) {
-            const newStatus = calculateStatus(measurement, updatedPlant.thresholds)
-            setStatus(newStatus)
-        } else {
-            loadMeasurement()
-        }
+    const handleMeasurementsCleared = () => {
+        setIsSettingsOpen(false)
+        setMeasurement(null)
+        setHistory([])
     }
 
     const { showConfirm, showToast } = useApp()
@@ -210,11 +89,16 @@ function PlantDetails() {
     const handlePlantDelete = () => {
         showConfirm(
             'Delete this plant?',
-            'This action cannot be undone.',
+            'This action cannot be undone. All measurements of this plant will be deleted too.',
             async () => {
-                await deletePlant(id)
-                showToast('Plant deleted', 'success')
-                navigate('/')
+                try {
+                    await deletePlant(id)
+                    await deletePhoto(id)
+                    showToast('Plant deleted', 'success')
+                    navigate('/')
+                } catch (err) {
+                    showToast(`Error: ${err.message}`, 'error')
+                }
             }
         )
     }
@@ -246,19 +130,14 @@ function PlantDetails() {
         'NO DATA': '⚪'
     }
 
+    const status = calculateStatus(measurement, plant)
     const statusClass = status === 'NO DATA' ? 'status_nodata' : `status_${status.toLowerCase()}`
-    const getDisplayName = () => {
-        if (plant.displayName && plant.displayName.trim().length > 0) {
-            return plant.displayName.trim()
-        }
-        return (trefleData && trefleData.common_name) || (plant.trefle && plant.trefle.common_name) || plant.name
-    }
-    const commonName = getDisplayName()
-    const scientificName = (trefleData && trefleData.scientific_name) || (plant.trefle && plant.trefle.scientific_name) || null
-    const family = (trefleData && trefleData.family) || (plant.trefle && plant.trefle.family) || null
-    const familyCommonName = (trefleData && trefleData.family_common_name) || (plant.trefle && plant.trefle.family_common_name) || null
-    const genus = (trefleData && trefleData.genus) || (plant.trefle && plant.trefle.genus) || null
-    const nativeTo = (trefleData && trefleData.native_to) || (plant.trefle && plant.trefle.native_to) || null
+    const commonName = plant.name
+    const scientificName = plant.scientific_name || (trefleData && trefleData.scientific_name) || null
+    const family = trefleData && trefleData.family
+    const familyCommonName = trefleData && trefleData.family_common_name
+    const genus = trefleData && trefleData.genus
+    const nativeTo = trefleData && trefleData.native_to
 
     const validHistory = history.filter(m => m.measured_at && !isNaN(new Date(m.measured_at).getTime()))
     const sortedHistory = [...validHistory].sort((a, b) => new Date(a.measured_at) - new Date(b.measured_at))
@@ -330,31 +209,33 @@ function PlantDetails() {
                     )}
                 </div>
 
-                {(family || genus || nativeTo) && (
-                    <div className="plant_info">
-                        {family && (
-                            <div className="plant_info_item">
-                                <span className="plant_info_label">Family:</span>
-                                <span className="plant_info_value">
-                                    {family}
-                                    {familyCommonName && ` (${familyCommonName})`}
-                                </span>
-                            </div>
-                        )}
-                        {genus && (
-                            <div className="plant_info_item">
-                                <span className="plant_info_label">Genus:</span>
-                                <span className="plant_info_value">{genus}</span>
-                            </div>
-                        )}
-                        {nativeTo && (
-                            <div className="plant_info_item">
-                                <span className="plant_info_label">Native to:</span>
-                                <span className="plant_info_value">{nativeTo}</span>
-                            </div>
-                        )}
+                <div className="plant_info">
+                    <div className="plant_info_item">
+                        <span className="plant_info_label">Device plant ID:</span>
+                        <span className="plant_info_value">{plant.id}</span>
                     </div>
-                )}
+                    {family && (
+                        <div className="plant_info_item">
+                            <span className="plant_info_label">Family:</span>
+                            <span className="plant_info_value">
+                                {family}
+                                {familyCommonName && ` (${familyCommonName})`}
+                            </span>
+                        </div>
+                    )}
+                    {genus && (
+                        <div className="plant_info_item">
+                            <span className="plant_info_label">Genus:</span>
+                            <span className="plant_info_value">{genus}</span>
+                        </div>
+                    )}
+                    {nativeTo && (
+                        <div className="plant_info_item">
+                            <span className="plant_info_label">Native to:</span>
+                            <span className="plant_info_value">{nativeTo}</span>
+                        </div>
+                    )}
+                </div>
 
                 <div className="card">
                     <div className="latest_header_row">
@@ -424,7 +305,7 @@ function PlantDetails() {
                                     </li>
                                 ))}
                                 <li ref={loadMoreRef} className="load_more_trigger">
-                                    {loadingMore ? 'Loading more...' : 'No more measurements'}
+                                    {history.length >= limit && limit < 500 ? 'Loading more...' : 'No more measurements'}
                                 </li>
                             </ul>
                         </div>
@@ -446,9 +327,10 @@ function PlantDetails() {
 
             <BottomSheet isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)}>
                 <PlantSettings
-                    plantId={id}
+                    plant={plant}
                     onSave={handlePlantUpdate}
                     onDelete={handlePlantDelete}
+                    onCleared={handleMeasurementsCleared}
                     onClose={() => setIsSettingsOpen(false)}
                 />
             </BottomSheet>

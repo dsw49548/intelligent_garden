@@ -1,43 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { getPlantById, updatePlant, deletePlant, getDefaultThresholds } from '../storage.js'
+import { useState } from 'react'
+import { updatePlant, clearPlantMeasurements } from '../api.js'
 import { useApp } from '../contexts/app_context.jsx'
 
-function PlantSettings({ plantId, onSave, onDelete, onClose }) {
-    const navigate = useNavigate()
+const THRESHOLD_KEYS = ['soil_min', 'soil_max', 'temp_min', 'temp_max', 'hum_min', 'hum_max', 'light_min', 'light_max']
+
+function PlantSettings({ plant, onSave, onDelete, onCleared, onClose }) {
     const { showConfirm, showToast } = useApp()
-    const [plant, setPlant] = useState(null)
-    const [thresholds, setThresholds] = useState(null)
-    const [displayName, setDisplayName] = useState('')
+    const [thresholds, setThresholds] = useState(() => Object.fromEntries(THRESHOLD_KEYS.map(k => [k, plant[k]])))
+    const [name, setName] = useState(plant.name)
     const [errors, setErrors] = useState({})
-    const initializedRef = useRef(false)
-    const plantIdRef = useRef(plantId)
-
-    useEffect(() => {
-        if (plantIdRef.current !== plantId) {
-            initializedRef.current = false
-            plantIdRef.current = plantId
-        }
-
-        const foundPlant = getPlantById(plantId)
-        if (!foundPlant) {
-            onClose()
-            return
-        }
-        setPlant(foundPlant)
-
-        if (!initializedRef.current) {
-            const defaults = getDefaultThresholds()
-            const plantThresholds = foundPlant.thresholds || {}
-            const mergedThresholds = {
-                ...defaults,
-                ...plantThresholds
-            }
-            setThresholds(mergedThresholds)
-            setDisplayName(foundPlant.displayName || '')
-            initializedRef.current = true
-        }
-    }, [plantId])
 
     const validateThreshold = (key, min, max) => {
         const range = getRange(key)
@@ -59,13 +30,11 @@ function PlantSettings({ plantId, onSave, onDelete, onClose }) {
         if (isNaN(numValue)) return
 
         setThresholds(prevThresholds => {
-            const defaults = getDefaultThresholds()
-            const baseThresholds = prevThresholds || defaults
-            const newThresholds = { ...baseThresholds }
+            const newThresholds = { ...prevThresholds }
             const minKey = `${key}_min`
             const maxKey = `${key}_max`
-            const currentMin = baseThresholds[minKey] !== undefined ? baseThresholds[minKey] : defaults[minKey]
-            const currentMax = baseThresholds[maxKey] !== undefined ? baseThresholds[maxKey] : defaults[maxKey]
+            const currentMin = prevThresholds[minKey]
+            const currentMax = prevThresholds[maxKey]
             const range = getRange(key)
 
             if (type === 'min') {
@@ -83,11 +52,7 @@ function PlantSettings({ plantId, onSave, onDelete, onClose }) {
         setErrors(newErrors)
     }
 
-    const handleSave = () => {
-        if (!thresholds) {
-            return
-        }
-
+    const handleSave = async () => {
         const allErrors = {}
         Object.keys(thresholds).forEach(key => {
             if (key.endsWith('_min')) {
@@ -106,58 +71,43 @@ function PlantSettings({ plantId, onSave, onDelete, onClose }) {
             return
         }
 
-        const thresholdsToSave = { ...thresholds }
-        const trimmedDisplayName = displayName.trim()
-        const displayNameToSave = trimmedDisplayName.length > 0 ? trimmedDisplayName : null
-
-        const updates = {
-            thresholds: thresholdsToSave,
-            displayName: displayNameToSave
+        if (!name.trim()) {
+            showToast('Error: Name is required', 'error')
+            return
         }
-        const updated = updatePlant(plantId, updates)
-        if (updated) {
+
+        try {
+            const updated = await updatePlant(plant.id, { name: name.trim(), ...thresholds })
             showToast('Saved', 'success')
-            if (onSave) {
-                onSave(updated)
-            } else {
-                onClose()
-            }
-        } else {
-            showToast('Error: Failed to save', 'error')
-            console.error('Failed to update plant:', plantId)
+            onSave(updated)
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error')
         }
     }
 
-    const handleDelete = () => {
-        if (onDelete) {
-            onDelete()
-        } else {
-            showConfirm(
-                'Delete this plant?',
-                'This action cannot be undone. This will also clear all cached measurements.',
-                async () => {
-                    await deletePlant(plantId)
-                    const cache = JSON.parse(localStorage.getItem('last_measurements') || '{}')
-                    delete cache[plantId]
-                    if (cache.history) {
-                        delete cache.history[plantId]
-                    }
-                    localStorage.setItem('last_measurements', JSON.stringify(cache))
-                    showToast('Plant deleted', 'success')
-                    navigate('/')
+    const handleClearMeasurements = () => {
+        showConfirm(
+            'Clear measurements?',
+            'All measurements of this plant will be deleted. This action cannot be undone.',
+            async () => {
+                try {
+                    const result = await clearPlantMeasurements(plant.id)
+                    showToast(`Deleted ${result.deleted} measurements`, 'success')
+                    onCleared()
+                } catch (err) {
+                    showToast(`Error: ${err.message}`, 'error')
                 }
-            )
-        }
+            },
+            'Clear'
+        )
     }
-
-    if (!plant || !thresholds) return null
 
     const getRange = (key) => {
         const ranges = {
-            soil_moisture: { min: 0, max: 100 },
-            air_temp_c: { min: -10, max: 50 },
-            air_humidity: { min: 0, max: 100 },
-            light_lux: { min: 0, max: 20000 }
+            soil: { min: 0, max: 100 },
+            temp: { min: -10, max: 50 },
+            hum: { min: 0, max: 100 },
+            light: { min: 0, max: 20000 }
         }
         return ranges[key] || { min: 0, max: 100 }
     }
@@ -165,9 +115,8 @@ function PlantSettings({ plantId, onSave, onDelete, onClose }) {
     const renderThreshold = (key, label, unit = '') => {
         const minKey = `${key}_min`
         const maxKey = `${key}_max`
-        const defaults = getDefaultThresholds()
-        const min = (thresholds && thresholds[minKey] !== undefined) ? thresholds[minKey] : defaults[minKey]
-        const max = (thresholds && thresholds[maxKey] !== undefined) ? thresholds[maxKey] : defaults[maxKey]
+        const min = thresholds[minKey]
+        const max = thresholds[maxKey]
         const range = getRange(key)
 
         return (
@@ -212,33 +161,31 @@ function PlantSettings({ plantId, onSave, onDelete, onClose }) {
             </div>
             <div className="plant_settings_content">
                 <div className="form_group" style={{ marginBottom: '1.5rem' }}>
-                    <label className="label" htmlFor="display-name">Display name</label>
+                    <label className="label" htmlFor="plant-name">Name</label>
                     <input
-                        id="display-name"
+                        id="plant-name"
                         type="text"
                         className="input"
-                        placeholder="Enter display name"
-                        value={displayName}
-                        onChange={(e) => {
-                            const value = e.target.value
-                            if (value.length <= 50) {
-                                setDisplayName(value)
-                            }
-                        }}
+                        placeholder="Enter plant name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                         maxLength={50}
                     />
                     <div style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '0.25rem' }}>
-                        {displayName.length}/50 characters
+                        {name.length}/50 characters
                     </div>
                 </div>
                 <h3>Thresholds</h3>
-                {renderThreshold('soil_moisture', 'Soil Moisture', '%')}
-                {renderThreshold('air_temp_c', 'Air Temperature', '°C')}
-                {renderThreshold('air_humidity', 'Air Humidity', '%')}
-                {renderThreshold('light_lux', 'Light', 'lux')}
+                {renderThreshold('soil', 'Soil Moisture', '%')}
+                {renderThreshold('temp', 'Air Temperature', '°C')}
+                {renderThreshold('hum', 'Air Humidity', '%')}
+                {renderThreshold('light', 'Light', 'lux')}
+                <button className="btn_secondary btn_reset" onClick={handleClearMeasurements}>
+                    Clear measurements
+                </button>
             </div>
             <div className="plant_settings_actions">
-                <button className="btn_danger" onClick={handleDelete}>Delete</button>
+                <button className="btn_danger" onClick={onDelete}>Delete</button>
                 <button className="btn_primary" onClick={handleSave}>Save</button>
             </div>
         </div>

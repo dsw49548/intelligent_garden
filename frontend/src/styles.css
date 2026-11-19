@@ -2101,3 +2101,24 @@ body {
   border-color: #f5c6cb;
   color: #721c24;
 }
+.auth_hint,
+.settings_hint {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-top: 0.5rem;
+}
+
+.auth_switch {
+  margin-top: 1.25rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.auth_switch a {
+  color: #4da3ff;
+}
+
+.plant_settings_content .btn_reset {
+  margin: 0.5rem 0 1rem;
+}
