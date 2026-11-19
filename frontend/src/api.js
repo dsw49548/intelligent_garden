@@ -89,3 +89,15 @@ export function fetchTreflePlantDetails(trefleId) {
 export function getTrefleRecommendations(trefleId) {
     return nullOn404(request('GET', `/api/trefle/${trefleId}/recommendations`))
 }
+
+export function waterPlant(id) {
+    return request('POST', `/api/plants/${id}/water`)
+}
+
+export function unblockPlant(id) {
+    return request('POST', `/api/plants/${id}/unblock`)
+}
+
+export function getWaterings(id) {
+    return request('GET', `/api/plants/${id}/waterings`)
+}

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
 import { calculateStatus } from '../storage.js'
-import { getPlant, deletePlant, fetchLatestMeasurement, fetchMeasurements, fetchTreflePlantDetails } from '../api.js'
+import { getPlant, deletePlant, fetchLatestMeasurement, fetchMeasurements, fetchTreflePlantDetails, waterPlant, unblockPlant, getWaterings } from '../api.js'
 import { deletePhoto } from '../storage_photos.js'
 import { loadPlantPhoto } from '../utils/photo_loader.js'
 import { useApp } from '../contexts/app_context.jsx'
@@ -11,6 +11,8 @@ import BottomSheet from '../components/bottom_sheet.jsx'
 import PlantSettings from '../components/plant_settings.jsx'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
+
+const WATER_ML_PER_SEC = 6
 
 function PlantDetails() {
     const { id } = useParams()
@@ -24,6 +26,9 @@ function PlantDetails() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [lastUpdated, setLastUpdated] = useState(null)
     const [coverImage, setCoverImage] = useState(null)
+    const [waterings, setWaterings] = useState([])
+    const [waterLeft, setWaterLeft] = useState(null)
+    const [waitingFor, setWaitingFor] = useState(null)
     const loadMoreRef = useRef(null)
 
     useEffect(() => {
@@ -50,6 +55,15 @@ function PlantDetails() {
         fetchMeasurements(id, limit)
             .then(setHistory)
             .catch(() => {})
+        getWaterings(id)
+            .then(data => {
+                setWaterings(data.waterings)
+                setWaterLeft(data.water_left_ml)
+            })
+            .catch(() => {})
+        getPlant(id)
+            .then(p => p && setPlant(p))
+            .catch(() => {})
     }
 
     useEffect(() => {
@@ -73,6 +87,14 @@ function PlantDetails() {
         return () => observer.disconnect()
     }, [history.length, limit])
 
+    useEffect(() => {
+        if (!waitingFor) return
+        const lastId = waterings.length ? waterings[0].id : null
+        if (lastId !== waitingFor.lastId || Date.now() > waitingFor.until) {
+            setWaitingFor(null)
+        }
+    }, [waterings])
+
     const handlePlantUpdate = (updatedPlant) => {
         setPlant(updatedPlant)
         setIsSettingsOpen(false)
@@ -89,6 +111,23 @@ function PlantDetails() {
     }
 
     const { showConfirm, showToast } = useApp()
+
+    const handleWaterNow = async () => {
+        try {
+            await waterPlant(plant.id)
+            setWaitingFor({ lastId: waterings.length ? waterings[0].id : null, until: Date.now() + 60000 })
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error')
+        }
+    }
+
+    const handleUnblock = async () => {
+        try {
+            setPlant(await unblockPlant(plant.id))
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error')
+        }
+    }
 
     const handlePlantDelete = () => {
         showConfirm(
@@ -215,8 +254,14 @@ function PlantDetails() {
 
                 <div className="plant_info">
                     <div className="plant_info_item">
-                        <span className="plant_info_label">Device plant ID:</span>
-                        <span className="plant_info_value">{plant.id}</span>
+                        {plant.device_id ? (
+                            <>
+                                <span className="plant_info_label">Sensor:</span>
+                                <span className="plant_info_value">{plant.device_id}</span>
+                            </>
+                        ) : (
+                            <span className="plant_info_label">No sensor</span>
+                        )}
                     </div>
                     {family && (
                         <div className="plant_info_item">
@@ -276,6 +321,36 @@ function PlantDetails() {
                         <div className="empty_state">
                             <p>No measurements yet</p>
                         </div>
+                    )}
+                </div>
+
+                <div className="card">
+                    <h3 className="card_title">Watering</h3>
+                    {plant.blocked && (
+                        <div className="watering_blocked">
+                            <span>{plant.block_reason || 'Watering is blocked'}</span>
+                            <button className="btn_secondary" onClick={handleUnblock}>Unblock</button>
+                        </div>
+                    )}
+                    <p className="watering_left">Water left today: {waterLeft ?? '-'} ml</p>
+                    <button
+                        className="btn_primary"
+                        onClick={handleWaterNow}
+                        disabled={!plant.device_id || plant.blocked || waterLeft === null || waterLeft < 10 || waitingFor !== null}
+                    >
+                        {waitingFor ? 'Waiting for device...' : 'Water now'}
+                    </button>
+                    {waterings.length > 0 && (
+                        <ul className="measurement_list" style={{ marginTop: '1rem' }}>
+                            {waterings.map(w => (
+                                <li key={w.id} className="measurement_item">
+                                    <span className="measurement_timestamp">{new Date(w.started_at).toLocaleString()}</span>
+                                    <span className="measurement_values">
+                                        {w.trigger} | {Math.round(w.duration_ms * WATER_ML_PER_SEC / 1000)} ml | {w.soil_before}% → {w.soil_after}% | <span className={`watering_${w.result}`}>{w.result}</span>
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
                     )}
                 </div>
 

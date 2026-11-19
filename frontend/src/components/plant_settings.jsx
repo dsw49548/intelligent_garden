@@ -4,12 +4,23 @@ import { savePhoto, deletePhoto, compressImage } from '../storage_photos.js'
 import { useApp } from '../contexts/app_context.jsx'
 
 const THRESHOLD_KEYS = ['soil_min', 'soil_max', 'temp_min', 'temp_max', 'hum_min', 'hum_max', 'light_min', 'light_max']
+const DEVICE_ID = 'esp32-1'
+const WATERING_FIELDS = [
+    ['soil_trigger', 'Water when soil below (%)'],
+    ['pump_ms', 'Pump time (ms)'],
+    ['min_interval_min', 'Min. interval between waterings (min)'],
+    ['soak_s', 'Soak time before check (s)'],
+    ['min_rise', 'Min. soil rise after watering (%)']
+]
 
 function PlantSettings({ plant, onSave, onDelete, onCleared, onClose, onPhotoChange }) {
     const { showConfirm, showToast } = useApp()
     const [thresholds, setThresholds] = useState(() => Object.fromEntries(THRESHOLD_KEYS.map(k => [k, plant[k]])))
     const [name, setName] = useState(plant.name)
     const [errors, setErrors] = useState({})
+    const [sensorOn, setSensorOn] = useState(plant.device_id === DEVICE_ID)
+    const [autoWatering, setAutoWatering] = useState(Boolean(plant.auto_watering))
+    const [watering, setWatering] = useState(() => Object.fromEntries(WATERING_FIELDS.map(([k]) => [k, plant[k]])))
     const fileInputRef = useRef(null)
 
     const validateThreshold = (key, min, max) => {
@@ -79,7 +90,14 @@ function PlantSettings({ plant, onSave, onDelete, onCleared, onClose, onPhotoCha
         }
 
         try {
-            const updated = await updatePlant(plant.id, { name: name.trim(), ...thresholds })
+            const wateringValues = Object.fromEntries(WATERING_FIELDS.map(([k]) => [k, parseInt(watering[k], 10)]))
+            const updated = await updatePlant(plant.id, {
+                name: name.trim(),
+                ...thresholds,
+                ...wateringValues,
+                auto_watering: autoWatering,
+                device_id: sensorOn ? DEVICE_ID : null
+            })
             showToast('Saved', 'success')
             onSave(updated)
         } catch (err) {
@@ -201,6 +219,28 @@ function PlantSettings({ plant, onSave, onDelete, onCleared, onClose, onPhotoCha
                         {name.length}/50 characters
                     </div>
                 </div>
+                <h3>Sensor</h3>
+                <label className="checkbox_row">
+                    <input type="checkbox" checked={sensorOn} onChange={(e) => setSensorOn(e.target.checked)} />
+                    Measured by ESP32 ({DEVICE_ID})
+                </label>
+                <h3>Watering</h3>
+                <label className="checkbox_row">
+                    <input type="checkbox" checked={autoWatering} onChange={(e) => setAutoWatering(e.target.checked)} />
+                    Auto watering
+                </label>
+                {WATERING_FIELDS.map(([key, label]) => (
+                    <div className="form_group" key={key}>
+                        <label className="label" htmlFor={key}>{label}</label>
+                        <input
+                            id={key}
+                            type="number"
+                            className="input"
+                            value={watering[key]}
+                            onChange={(e) => setWatering({ ...watering, [key]: e.target.value })}
+                        />
+                    </div>
+                ))}
                 <h3>Photo</h3>
                 <input
                     ref={fileInputRef}

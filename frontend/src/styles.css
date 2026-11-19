@@ -2122,3 +2122,39 @@ body {
 .plant_settings_content .btn_reset {
   margin: 0.5rem 0 1rem;
 }
+
+.checkbox_row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.watering_blocked {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background: #5a2d2d;
+  border: 1px solid #7a3a3a;
+  border-radius: 6px;
+  color: #ff6b6b;
+}
+
+.watering_left {
+  margin: 0 0 1rem;
+}
+
+.watering_ok {
+  color: #4caf50;
+}
+
+.watering_no_effect {
+  color: #ff6b6b;
+}
+
+.watering_aborted {
+  color: #ffb74d;
+}
