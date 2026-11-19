@@ -72,7 +72,46 @@ DB.create_table? :plants do
   String :created_at, null: false
 end
 
-THRESHOLD_KEYS = %w[soil_min soil_max temp_min temp_max hum_min hum_max light_min light_max]
+NEW_PLANT_COLUMNS = {
+  device_id: [String, nil],
+  auto_watering: [TrueClass, false],
+  soil_trigger: [Integer, 30],
+  pump_ms: [Integer, 2000],
+  min_interval_min: [Integer, 30],
+  soak_s: [Integer, 60],
+  min_rise: [Integer, 5],
+  blocked: [TrueClass, false],
+  block_reason: [String, nil],
+  water_now: [TrueClass, false]
+}
+NEW_PLANT_COLUMNS.each do |name, (type, default)|
+  DB.add_column(:plants, name, type, default: default) unless DB[:plants].columns.include?(name)
+end
+
+DB.create_table? :waterings do
+  primary_key :id
+  Integer :plant_id, null: false
+  String :started_at, null: false
+  Integer :duration_ms, null: false
+  String :trigger, null: false
+  Integer :soil_before
+  Integer :soil_after
+  String :result, null: false
+  String :created_at, null: false
+end
+
+WATER_ML_PER_SEC = 6
+MAX_WATER_ML_PER_DAY = 100
+
+WATERING_RANGES = {
+  'soil_trigger' => 0..100,
+  'pump_ms' => 500..10000,
+  'min_interval_min' => 1..1440,
+  'soak_s' => 10..600,
+  'min_rise' => 1..50
+}
+
+THRESHOLD_KEYS =%w[soil_min soil_max temp_min temp_max hum_min hum_max light_min light_max]
 
 DEFAULT_THRESHOLDS = {
   'soil_min' => 30, 'soil_max' => 70,
@@ -151,18 +190,58 @@ def plant_fields(data, old)
   error_message = validate_thresholds(thresholds)
   error!(400, error_message) if error_message
   thresholds.each { |k, v| fields[k.to_sym] = v }
+  WATERING_RANGES.each do |key, range|
+    next unless data.key?(key)
+    error!(400, "out of range: #{key} (#{range.min}-#{range.max})") unless data[key].is_a?(Integer) && range.include?(data[key])
+    fields[key.to_sym] = data[key]
+  end
+  if data.key?('auto_watering')
+    error!(400, 'invalid field: auto_watering') unless [true, false].include?(data['auto_watering'])
+    fields[:auto_watering] = data['auto_watering']
+  end
   fields
 end
 
+def water_left_ml(plant_id)
+  since = (Time.now.utc - 24 * 3600).iso8601
+  used_ms = DB[:waterings].where(plant_id: plant_id).where { started_at >= since }.sum(:duration_ms) || 0
+  [MAX_WATER_ML_PER_DAY - used_ms * WATER_ML_PER_SEC / 1000.0, 0].max.floor
+end
+
+def device_config(plant, water_now)
+  wait_s = 0
+  last = DB[:waterings].where(plant_id: plant[:id]).order(Sequel.desc(:started_at)).first
+  if last
+    next_time = Time.iso8601(last[:started_at]) + plant[:min_interval_min] * 60
+    wait_s = [(next_time - Time.now).ceil, 0].max
+  end
+  {
+    auto_watering: plant[:auto_watering],
+    soil_trigger: plant[:soil_trigger],
+    pump_ms: plant[:pump_ms],
+    min_interval_s: plant[:min_interval_min] * 60,
+    soak_s: plant[:soak_s],
+    min_rise: plant[:min_rise],
+    blocked: plant[:blocked],
+    water_now: water_now,
+    wait_s: wait_s,
+    water_left_ml: water_left_ml(plant[:id])
+  }
+end
+
 def validate_measurement(data)
-  required_fields = %w[plant_id measured_at soil_moisture air_temp_c air_humidity light_lux]
+  required_fields = %w[measured_at soil_moisture air_temp_c air_humidity light_lux]
   required_fields.each do |field|
     unless data.key?(field)
       return { error: "missing field: #{field}" }
     end
   end
 
-  unless data['plant_id'].is_a?(Integer) && data['plant_id'] > 0
+  if data.key?('device_id')
+    return { error: 'invalid field: device_id' } unless data['device_id'].is_a?(String) && !data['device_id'].empty?
+  elsif !data.key?('plant_id')
+    return { error: 'missing field: plant_id or device_id' }
+  elsif !(data['plant_id'].is_a?(Integer) && data['plant_id'] > 0)
     return { error: 'invalid field: plant_id' }
   end
 
@@ -341,7 +420,15 @@ end
 
 put '/api/plants/:id' do
   plant = find_plant(params['id'])
-  DB[:plants].where(id: plant[:id]).update(plant_fields(json_body, plant))
+  data = json_body
+  fields = plant_fields(data, plant)
+  if data.key?('device_id')
+    device_id = data['device_id']
+    error!(400, 'invalid field: device_id') unless device_id.nil? || (device_id.is_a?(String) && device_id.length.between?(1, 50))
+    fields[:device_id] = device_id
+    DB[:plants].exclude(id: plant[:id]).where(device_id: device_id).update(device_id: nil) if device_id
+  end
+  DB[:plants].where(id: plant[:id]).update(fields)
   DB[:plants].where(id: plant[:id]).first.to_json
 end
 
@@ -349,6 +436,7 @@ delete '/api/plants/:id' do
   plant = find_plant(params['id'])
   DB.transaction do
     DB[:measurements].where(plant_id: plant[:id]).delete
+    DB[:waterings].where(plant_id: plant[:id]).delete
     DB[:plants].where(id: plant[:id]).delete
   end
   { status: 'ok' }.to_json
@@ -358,6 +446,28 @@ delete '/api/plants/:id/measurements' do
   plant = find_plant(params['id'])
   deleted = DB[:measurements].where(plant_id: plant[:id]).delete
   { status: 'ok', deleted: deleted }.to_json
+end
+
+post '/api/plants/:id/water' do
+  plant = find_plant(params['id'])
+  error!(409, 'plant has no sensor') unless plant[:device_id]
+  error!(409, "watering blocked: #{plant[:block_reason]}") if plant[:blocked]
+  error!(409, 'daily water limit reached') if water_left_ml(plant[:id]) < 10
+  DB[:plants].where(id: plant[:id]).update(water_now: true)
+  status 202
+  { status: 'queued' }.to_json
+end
+
+post '/api/plants/:id/unblock' do
+  plant = find_plant(params['id'])
+  DB[:plants].where(id: plant[:id]).update(blocked: false, block_reason: nil)
+  DB[:plants].where(id: plant[:id]).first.to_json
+end
+
+get '/api/plants/:id/waterings' do
+  plant = find_plant(params['id'])
+  waterings = DB[:waterings].where(plant_id: plant[:id]).order(Sequel.desc(:started_at)).limit(20).all
+  { waterings: waterings, water_left_ml: water_left_ml(plant[:id]) }.to_json
 end
 
 get '/api/trefle/search' do
@@ -432,10 +542,16 @@ post '/api/measurements' do
     return validation_error.to_json
   end
 
-  error!(404, 'unknown plant') if DB[:plants].where(id: data['plant_id']).empty?
+  if data['device_id']
+    plant = DB[:plants].where(device_id: data['device_id']).first
+    error!(404, 'device not paired') unless plant
+  else
+    plant = DB[:plants].where(id: data['plant_id']).first
+    error!(404, 'unknown plant') unless plant
+  end
 
   id = DB[:measurements].insert(
-    plant_id: data['plant_id'],
+    plant_id: plant[:id],
     measured_at: data['measured_at'],
     soil_moisture: data['soil_moisture'],
     air_temp_c: data['air_temp_c'],
@@ -444,8 +560,43 @@ post '/api/measurements' do
     created_at: now
   )
 
+  water_now = data['device_id'] && plant[:water_now] ? true : false
+  DB[:plants].where(id: plant[:id]).update(water_now: false) if water_now
+
   status 201
-  DB[:measurements].where(id: id).first.to_json
+  DB[:measurements].where(id: id).first.merge(device: device_config(plant, water_now)).to_json
+end
+
+post '/api/waterings' do
+  data = json_body
+  plant = DB[:plants].where(device_id: data['device_id'].to_s).first
+  error!(404, 'device not paired') unless plant
+  begin
+    Time.iso8601(data['started_at'].to_s)
+  rescue ArgumentError
+    error!(400, 'invalid field: started_at')
+  end
+  error!(400, 'invalid field: duration_ms') unless data['duration_ms'].is_a?(Integer) && data['duration_ms'].between?(0, 60000)
+  error!(400, 'invalid field: trigger') unless %w[auto manual].include?(data['trigger'])
+  error!(400, 'invalid field: result') unless %w[ok no_effect aborted].include?(data['result'])
+
+  id = DB[:waterings].insert(
+    plant_id: plant[:id],
+    started_at: data['started_at'],
+    duration_ms: data['duration_ms'],
+    trigger: data['trigger'],
+    soil_before: data['soil_before'],
+    soil_after: data['soil_after'],
+    result: data['result'],
+    created_at: now
+  )
+  if data['result'] == 'no_effect'
+    reason = "No soil moisture increase after watering (#{data['soil_before']}% -> #{data['soil_after']}%)"
+    DB[:plants].where(id: plant[:id]).update(blocked: true, block_reason: reason)
+  end
+
+  status 201
+  DB[:waterings].where(id: id).first.merge(blocked: DB[:plants].where(id: plant[:id]).get(:blocked)).to_json
 end
 
 get '/api/measurements/latest' do

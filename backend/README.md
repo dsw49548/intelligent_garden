@@ -32,9 +32,13 @@ Endpointy oznaczone (auth) wymagają nagłówka `Authorization: Bearer <token>`,
 | POST | `/api/logout` | (auth) usuwa token |
 | GET | `/api/me` | (auth) zalogowany użytkownik |
 | GET, POST | `/api/plants` | (auth) lista / dodanie rośliny |
-| GET, PUT, DELETE | `/api/plants/:id` | (auth) roślina; DELETE usuwa też jej pomiary; cudza roślina → 404 |
+| GET, PUT, DELETE | `/api/plants/:id` | (auth) roślina; PUT przyjmuje też `device_id` (string/null) i ustawienia podlewania; DELETE usuwa też jej pomiary; cudza roślina → 404 |
 | DELETE | `/api/plants/:id/measurements` | (auth) czyści pomiary rośliny |
-| POST | `/api/measurements` | pomiar z ESP32 / Fake IoT (bez logowania); nieznana roślina → 404 |
+| POST | `/api/plants/:id/water` | (auth) podlej teraz → 202; 409 gdy blokada, limit dobowy albo brak czujnika |
+| POST | `/api/plants/:id/unblock` | (auth) zdejmuje blokadę podlewania |
+| GET | `/api/plants/:id/waterings` | (auth) ostatnie 20 podlewań + `water_left_ml` |
+| POST | `/api/measurements` | pomiar z ESP32 (`device_id`) / Fake IoT (`plant_id`), bez logowania; odpowiedź zawiera `device` (config podlewania); niesparowane urządzenie / nieznana roślina → 404 |
+| POST | `/api/waterings` | zdarzenie podlewania z ESP32 (`device_id`), bez logowania; `no_effect` blokuje roślinę |
 | GET | `/api/measurements/latest?plant_id=1` | (auth) ostatni pomiar |
 | GET | `/api/measurements?plant_id=1&limit=200` | (auth) historia (limit 1-500) |
 | GET | `/api/trefle/search?q=QUERY` | (auth) wyszukiwarka Trefle |
