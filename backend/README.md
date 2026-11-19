@@ -37,6 +37,7 @@ Endpointy oznaczone (auth) wymagają nagłówka `Authorization: Bearer <token>`,
 | POST | `/api/plants/:id/water` | (auth) podlej teraz → 202; 409 gdy blokada, limit dobowy albo brak czujnika |
 | POST | `/api/plants/:id/unblock` | (auth) zdejmuje blokadę podlewania |
 | GET | `/api/plants/:id/waterings` | (auth) ostatnie 20 podlewań + `water_left_ml` |
+| GET | `/api/plants/:id/stats?days=1\|7\|30` | (auth) statystyki: min/max/avg, % w progach, tempo wysychania, zestawienie dzienne, podlewania |
 | POST | `/api/measurements` | pomiar z ESP32 (`device_id`) / Fake IoT (`plant_id`), bez logowania; odpowiedź zawiera `device` (config podlewania); niesparowane urządzenie / nieznana roślina → 404 |
 | POST | `/api/waterings` | zdarzenie podlewania z ESP32 (`device_id`), bez logowania; `no_effect` blokuje roślinę |
 | GET | `/api/measurements/latest?plant_id=1` | (auth) ostatni pomiar |
@@ -44,6 +45,10 @@ Endpointy oznaczone (auth) wymagają nagłówka `Authorization: Bearer <token>`,
 | GET | `/api/trefle/search?q=QUERY` | (auth) wyszukiwarka Trefle |
 | GET | `/api/trefle/:id` | (auth) szczegóły rośliny z Trefle |
 | GET | `/api/trefle/:id/recommendations` | (auth) progi wyliczone z danych Trefle (`main_species.growth`) |
+
+Statystyki dzienne (`daily`) liczone są dla dni w UTC.
+
+Roślina demo z symulowanymi danymi z 7 dni: `bundle exec ruby seed_demo.rb <username>`.
 
 ## Przykłady
 

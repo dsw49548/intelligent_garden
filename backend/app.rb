@@ -7,6 +7,7 @@ require 'dotenv/load'
 require 'cgi'
 require 'bcrypt'
 require 'securerandom'
+require 'webrick'
 require_relative 'lib/trefle_client'
 
 use Rack::Cors do
@@ -19,6 +20,8 @@ end
 set :bind, '0.0.0.0'
 set :port, 4567
 set :server, "webrick"
+set :show_exceptions, :after_handler
+disable :method_override
 
 DB_PATH = ENV['DB_PATH'] || File.expand_path(File.join(__dir__, "db.sqlite3"))
 DB = Sequel.connect("sqlite://#{DB_PATH}")
@@ -88,6 +91,8 @@ NEW_PLANT_COLUMNS.each do |name, (type, default)|
   DB.add_column(:plants, name, type, default: default) unless DB[:plants].columns.include?(name)
 end
 
+DB.add_index :measurements, [:plant_id, :measured_at] unless DB.indexes(:measurements).key?(:measurements_plant_id_measured_at_index)
+
 DB.create_table? :waterings do
   primary_key :id
   Integer :plant_id, null: false
@@ -119,6 +124,13 @@ DEFAULT_THRESHOLDS = {
   'hum_min' => 40, 'hum_max' => 70,
   'light_min' => 500, 'light_max' => 5000
 }
+
+# POST/PUT bez Content-Length (np. curl -X POST bez -d): WEBrick rzuca wyjatek przy czytaniu body
+error WEBrick::HTTPStatus::LengthRequired do
+  content_type :json
+  status 400
+  { error: 'empty body (missing Content-Length)' }.to_json
+end
 
 before do
   content_type :json
@@ -468,6 +480,72 @@ get '/api/plants/:id/waterings' do
   plant = find_plant(params['id'])
   waterings = DB[:waterings].where(plant_id: plant[:id]).order(Sequel.desc(:started_at)).limit(20).all
   { waterings: waterings, water_left_ml: water_left_ml(plant[:id]) }.to_json
+end
+
+STAT_COLUMNS = { 'soil' => 'soil_moisture', 'temp' => 'air_temp_c', 'hum' => 'air_humidity', 'light' => 'light_lux' }
+
+# hours: srednie godzinowe gleby [{hour:, soil:}]; wzrosty (podlanie) i dziury w danych pomijamy
+def drying_rate(hours)
+  drops = []
+  hours.each_cons(2) do |a, b|
+    next unless Time.iso8601("#{b[:hour]}:00:00Z") - Time.iso8601("#{a[:hour]}:00:00Z") == 3600
+    drops << a[:soil] - b[:soil] if b[:soil] < a[:soil]
+  end
+  drops.empty? ? nil : (drops.sum / drops.size).round(2)
+end
+
+get '/api/plants/:id/stats' do
+  plant = find_plant(params['id'])
+  days = (params['days'] || 7).to_i
+  error!(400, 'days must be 1, 7 or 30') unless [1, 7, 30].include?(days)
+  since = (Time.now.utc - days * 24 * 3600).iso8601
+  where = 'WHERE plant_id = ? AND measured_at >= ?'
+
+  parts = ['COUNT(*) AS count', 'MIN(measured_at) AS first', 'MAX(measured_at) AS last']
+  STAT_COLUMNS.each do |key, col|
+    parts << "MIN(#{col}) AS #{key}_min, MAX(#{col}) AS #{key}_max, AVG(#{col}) AS #{key}_avg"
+    parts << "SUM(#{col} BETWEEN #{plant[:"#{key}_min"].to_f} AND #{plant[:"#{key}_max"].to_f}) AS #{key}_in"
+  end
+  row = DB.fetch("SELECT #{parts.join(', ')} FROM measurements #{where}", plant[:id], since).first
+
+  summary = { count: row[:count], from: row[:first], to: row[:last] }
+  in_range = {}
+  STAT_COLUMNS.each_key do |key|
+    avg = row[:"#{key}_avg"]
+    summary[key] = { min: row[:"#{key}_min"], max: row[:"#{key}_max"], avg: avg && avg.round(1) }
+    in_range[key] = row[:count] > 0 ? (row[:"#{key}_in"] * 100.0 / row[:count]).round(1) : nil
+  end
+
+  hours = DB.fetch("SELECT substr(measured_at, 1, 13) AS hour, AVG(soil_moisture) AS soil FROM measurements #{where} GROUP BY hour ORDER BY hour", plant[:id], since).all
+  hours_by_day = hours.group_by { |h| h[:hour][0, 10] }
+  watering_days = DB.fetch("SELECT substr(started_at, 1, 10) AS date, COUNT(*) AS count, SUM(duration_ms) AS ms FROM waterings WHERE plant_id = ? AND started_at >= ? GROUP BY date", plant[:id], since).as_hash(:date)
+
+  daily = DB.fetch("SELECT substr(measured_at, 1, 10) AS date, AVG(air_temp_c) AS avg_temp, AVG(air_humidity) AS avg_hum, AVG(light_lux) AS avg_light FROM measurements #{where} GROUP BY date ORDER BY date", plant[:id], since).map do |d|
+    day_hours = hours_by_day[d[:date]]
+    w = watering_days[d[:date]]
+    {
+      date: d[:date],
+      avg_temp: d[:avg_temp].round(1),
+      avg_hum: d[:avg_hum].round(1),
+      avg_light: d[:avg_light].round,
+      soil_start: day_hours.first[:soil].round(1),
+      soil_end: day_hours.last[:soil].round(1),
+      drying_rate: drying_rate(day_hours),
+      waterings: w ? w[:count] : 0,
+      water_ml: w ? (w[:ms] * WATER_ML_PER_SEC / 1000.0).round : 0
+    }
+  end
+
+  w = DB.fetch("SELECT COUNT(*) AS count, SUM(result = 'ok') AS ok, SUM(result = 'no_effect') AS no_effect, SUM(result = 'aborted') AS aborted, SUM(duration_ms) AS ms FROM waterings WHERE plant_id = ? AND started_at >= ?", plant[:id], since).first
+
+  {
+    days: days,
+    summary: summary,
+    in_range_pct: in_range,
+    drying_rate: drying_rate(hours),
+    daily: daily,
+    waterings: { count: w[:count], ok: w[:ok].to_i, no_effect: w[:no_effect].to_i, aborted: w[:aborted].to_i, total_ml: (w[:ms].to_i * WATER_ML_PER_SEC / 1000.0).round }
+  }.to_json
 end
 
 get '/api/trefle/search' do
