@@ -1,117 +1,113 @@
 Intelligent Garden to projekt systemu monitorowania roślin z wykorzystaniem czujników IoT. Projekt składa się z generatora danych Fake IoT oraz backendu API w Ruby z frameworkiem Sinatra, który przechowuje dane z czujników roślin w bazie SQLite.
 
-## Quick Start (Local)
+## Uruchomienie
 
-### Wymagania
-- Ruby (z bundlerem)
-- Node.js i npm
+### Jednorazowa konfiguracja
 
-### Instalacja zależności
+Wymagania: Ruby z bundlerem, Node.js z npm, `adb` (Android platform-tools), PlatformIO (dla firmware).
 
-**Backend** (tylko 1x lub gdy zmienione zależności):
 ```bash
+# backend
 cd backend
+bundle config set --local path 'vendor/bundle'
 bundle install
-```
+echo "TREFLE_TOKEN=twoj_token" > .env   # backend/.env, token z trefle.io
+cd ..
 
-**Frontend** (tylko 1x lub gdy zmienione zależności):
-```bash
+# frontend
 cd frontend
 npm install
+cd ..
+
+# firmware
+cp firmware/src/config.example.h firmware/src/config.h
+# w config.h uzupełnij WIFI_SSID, WIFI_PASSWORD i SERVER_HOST (wynik `hostname -I`)
 ```
 
-### Uruchomienie
+`backend/.env` i `firmware/src/config.h` są w `.gitignore` — nie commituj ich.
 
-**1. Backend**
+### Start (4 terminale)
 
-**Konfiguracja Trefle (opcjonalnie, dla danych roślin):**
+Telefon musi być podłączony przez USB (patrz niżej).
+
 ```bash
-cd backend
-# Utwórz plik .env i dodaj token Trefle:
-echo "TREFLE_TOKEN=your_token_here" > .env
+# terminal 1 — backend (http://localhost:4567)
+cd backend && bundle exec ruby app.rb
 ```
 
-**Uruchomienie:**
 ```bash
-cd backend
-bundle exec ruby app.rb
+# terminal 2 — frontend, build produkcyjny + preview (http://localhost:4173)
+cd frontend && npm run build && npm run preview
 ```
-Backend działa na `http://localhost:4567`
 
-**Test sanity:**
 ```bash
-curl http://localhost:4567/health
+# terminal 3 — przekierowanie portu frontendu na telefon
+adb reverse tcp:4173 tcp:4173
 ```
-Oczekiwany wynik: `{"status":"ok"}`
 
-**Test Trefle proxy (jeśli token ustawiony):**
 ```bash
-curl "http://localhost:4567/api/plants/search?q=mon"
-curl "http://localhost:4567/api/plants/59042"
-curl "http://localhost:4567/api/plants/ping"
+# terminal 4 — przekierowanie portu backendu na telefon
+adb reverse tcp:4567 tcp:4567
 ```
 
-**2. Frontend**
+Sprawdzenie backendu: `curl http://localhost:4567/health` → `{"status":"ok"}`.
+
+### Telefon (Android) krok po kroku
+
+1. Ustawienia → Informacje o telefonie → 7× stuknij „Numer kompilacji”, aby włączyć opcje programisty.
+2. Opcje programisty → włącz **Debugowanie USB**.
+3. Podłącz telefon kablem i zaakceptuj na telefonie okno „Zezwolić na debugowanie USB?”.
+4. `adb devices` — urządzenie musi mieć status `device` (nie `unauthorized`).
+5. Wykonaj oba `adb reverse` z sekcji Start.
+6. W Chrome na telefonie otwórz `http://localhost:4173`.
+7. Menu Chrome (⋮) → **Zainstaluj aplikację** / **Dodaj do ekranu głównego**.
+
+WebAPK instaluje się tylko z preview (port 4173), nie z dev servera (`npm run dev`, port 5173).
+Przy błędzie „Failed to install WebAPK”: Ustawienia → Aplikacje → Sklep Google Play → Pamięć → **Wyczyść dane**, potem spróbuj ponownie.
+
+### Firmware (ESP32)
+
 ```bash
-cd frontend
-npm run dev -- --host
-```
-Frontend działa na `http://localhost:5173`
+# wgranie
+~/.platformio/penv/bin/pio run -d firmware -t upload
 
-Test sanity:
+# monitor portu szeregowego (115200, /dev/ttyUSB0)
+~/.platformio/penv/bin/pio device monitor -d firmware
+```
+
+Komendy do ESP32 można wysyłać z drugiego terminala (odpowiedź pojawia się w monitorze):
+
 ```bash
-curl -I http://localhost:5173
+printf 'status\n' > /dev/ttyUSB0
+printf 'pump 2000\n' > /dev/ttyUSB0
+printf 'stop\n' > /dev/ttyUSB0
 ```
-Oczekiwany wynik: `HTTP/1.1 200 OK`
 
-**3. Fake IoT Generator (CLI)**
+Pełna lista: `printf 'help\n' > /dev/ttyUSB0`.
+`SERVER_HOST` w `config.h` = adres IP laptopa z `hostname -I` (laptop i ESP32 w tej samej sieci WiFi). Po zmianie IP wgraj firmware ponownie.
+
+### Fake IoT (opcjonalnie, zamiast ESP32)
+
+W osobnym terminalu, przy działającym backendzie:
+
 ```bash
-cd backend
-bundle exec ruby fake_iot.rb
+cd backend && bundle exec ruby fake_iot.rb
 ```
 
-Po uruchomieniu dostępne komendy:
-- `help` - lista komend
-- `status` - aktualny stan
-- `once` - wyślij jeden pomiar dla wszystkich plant_id
-- `start` - rozpocznij ciągłą wysyłkę
-- `stop` - zatrzymaj wysyłkę
-- `mode <NAME>` - ustaw tryb (stable, daynight, dryout, randomwalk)
-- `interval <SECONDS>` - ustaw interwał (0.2-3600)
-- `add <PLANT_ID>` - dodaj plant_id
-- `set <ID1,ID2,...>` - ustaw listę plant_id
-- `quit` - wyjście
+W CLI: `set 1` (plant_id), potem `once` (jeden pomiar) lub `start` (ciągła wysyłka), `stop`, `quit`.
+Inne komendy: `mode <stable|daynight|dryout|randomwalk>`, `interval <s>`, `status`, `help`.
 
-### Sanity Flow (Demo)
+### Zatrzymanie
 
-1. **Uruchom backend:**
-   ```bash
-   cd backend
-   bundle exec ruby app.rb
-   ```
-   Backend działa na `http://localhost:4567`
+1. `Ctrl+C` w terminalu backendu i frontendu (oraz Fake IoT / monitora, jeśli działają).
+2. `adb reverse --remove-all`
 
-2. **W nowym terminalu uruchom Fake IoT:**
-   ```bash
-   cd backend
-   bundle exec ruby fake_iot.rb
-   ```
-   W CLI wykonaj:
-   - `set 1` - ustaw plant_id=1
-   - `once` - wyślij jeden pomiar (lub `start` dla ciągłej wysyłki)
+### Najczęstsze problemy
 
-3. **Uruchom frontend:**
-   ```bash
-   cd frontend
-   npm run dev -- --host
-   ```
-   Frontend działa na `http://localhost:5173`
-
-4. **Otwórz w przeglądarce:**
-   - Wejdź na `http://localhost:5173`
-   - Kliknij kafelek "+ Add plant" i dodaj roślinę
-   - Kliknij na roślinę, aby zobaczyć szczegóły i wykresy
-   - Wykresy i historia pojawią się po wysłaniu pomiarów przez Fake IoT
+- **Zajęty port** (`Address already in use` dla 4567 lub preview na innym porcie niż 4173): znajdź proces `ss -ltnp | grep -E ':4567|:4173'` i zakończ go `kill <PID>`.
+- **`POST -1` w logu ESP32**: brak połączenia z backendem — sprawdź, czy backend działa, czy `SERVER_HOST` zgadza się z aktualnym `hostname -I`, czy ESP32 i laptop są w tej samej sieci i czy firewall nie blokuje portu 4567.
+- **Telefon `unauthorized` w `adb devices`**: odblokuj telefon i zaakceptuj okno debugowania USB; jeśli się nie pojawia — Opcje programisty → Odwołaj autoryzacje debugowania USB, odłącz i podłącz kabel, `adb kill-server && adb devices`.
+- **Aplikacja na telefonie bez danych**: brak `adb reverse tcp:4567 tcp:4567` (np. po ponownym podłączeniu kabla) — wykonaj ponownie oba `adb reverse` i odśwież aplikację.
 
 ## Kiedy instalować zależności?
 
@@ -133,9 +129,3 @@ Po uruchomieniu dostępne komendy:
   - Endpointy API: `/health`, `/api/measurements`, `/api/measurements/latest`, `/api/measurements?plant_id=X&limit=Y`
   - Endpointy Trefle proxy: `/api/plants/search?q=QUERY`, `/api/plants/:id`, `/api/plants/ping`
 - `frontend/` - React PWA (Vite + React Router + Chart.js)
-
-## Scenariusz Android USB
-
-Jeśli testujesz na urządzeniu Android przez USB:
-- użyj `adb reverse tcp:5173 tcp:5173` dla frontendu
-- użyj `adb reverse tcp:4567 tcp:4567` dla backendu
