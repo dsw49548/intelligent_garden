@@ -5,6 +5,7 @@ import Layout from './components/layout.jsx'
 import Plants from './pages/plants.jsx'
 import AddPlant from './pages/add_plant.jsx'
 import PlantDetails from './pages/plant_details.jsx'
+import PlantStats from './pages/plant_stats.jsx'
 import AppSettings from './pages/app_settings.jsx'
 import About from './pages/about.jsx'
 import Auth from './pages/auth.jsx'
@@ -35,6 +36,7 @@ function AppContent() {
           <Route path="/" element={<Plants />} />
           <Route path="/add" element={<AddPlant />} />
           <Route path="/plant/:id" element={<PlantDetails />} />
+          <Route path="/plant/:id/stats" element={<PlantStats />} />
           <Route path="/settings" element={<AppSettings />} />
           <Route path="/about" element={<About />} />
           <Route path="/login" element={<Auth mode="login" />} />

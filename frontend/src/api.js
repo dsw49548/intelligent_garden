@@ -101,3 +101,7 @@ export function unblockPlant(id) {
 export function getWaterings(id) {
     return request('GET', `/api/plants/${id}/waterings`)
 }
+
+export function getPlantStats(id, days) {
+    return request('GET', `/api/plants/${id}/stats?days=${days}`)
+}

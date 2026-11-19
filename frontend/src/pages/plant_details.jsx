@@ -286,6 +286,10 @@ function PlantDetails() {
                     )}
                 </div>
 
+                <button className="btn_secondary stats_button" onClick={() => navigate(`/plant/${id}/stats`)}>
+                    Statistics
+                </button>
+
                 <div className="card">
                     <div className="latest_header_row">
                         <h3 className="card_title" style={{ margin: 0 }}>Latest measurement</h3>

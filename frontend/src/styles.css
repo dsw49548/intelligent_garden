@@ -2158,3 +2158,66 @@ body {
 .watering_aborted {
   color: #ffb74d;
 }
+
+.stats_button {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.stats_periods {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.stats_periods button {
+  flex: 1;
+  padding: 0.5rem;
+}
+
+.stats_period_info {
+  font-size: 0.8rem;
+  color: #888;
+  margin: 0.5rem 0;
+}
+
+.stats_tiles {
+  margin-bottom: 1rem;
+}
+
+.stats_tile_detail {
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+.stats_table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.stats_table th,
+.stats_table td {
+  padding: 0.4rem 0.2rem;
+  text-align: right;
+  border-bottom: 1px solid #333;
+}
+
+.stats_table th:first-child,
+.stats_table td:first-child {
+  text-align: left;
+}
+
+.stats_table th {
+  color: #aaa;
+  font-weight: 500;
+}
+
+[data-theme="light"] .stats_table th,
+[data-theme="light"] .stats_table td {
+  border-color: #ddd;
+}
+
+.stats_back {
+  margin-bottom: 1rem;
+}
