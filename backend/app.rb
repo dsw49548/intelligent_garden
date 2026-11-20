@@ -626,6 +626,9 @@ post '/api/waterings' do
   error!(400, 'invalid field: duration_ms') unless data['duration_ms'].is_a?(Integer) && data['duration_ms'].between?(0, 60000)
   error!(400, 'invalid field: trigger') unless %w[auto manual].include?(data['trigger'])
   error!(400, 'invalid field: result') unless %w[ok no_effect aborted].include?(data['result'])
+  %w[soil_before soil_after].each do |key|
+    error!(400, "out of range: #{key}") unless data[key].is_a?(Integer) && data[key].between?(0, 100)
+  end
 
   id = DB[:waterings].insert(
     plant_id: plant[:id],
