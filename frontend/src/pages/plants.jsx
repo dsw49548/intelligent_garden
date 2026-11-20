@@ -8,9 +8,10 @@ function Plants() {
     const [plants, setPlants] = useState([])
     const [latestById, setLatestById] = useState({})
     const [plantPhotos, setPlantPhotos] = useState({})
+    const [loadError, setLoadError] = useState(false)
 
     useEffect(() => {
-        getPlants().then(setPlants).catch(() => {})
+        getPlants().then(setPlants).catch(() => setLoadError(true))
     }, [])
 
     useEffect(() => {
@@ -37,6 +38,14 @@ function Plants() {
         }
         loadPhotos()
     }, [plants])
+
+    if (loadError) {
+        return (
+            <div className="card empty_state">
+                <p>Cannot connect to server</p>
+            </div>
+        )
+    }
 
     return (
         <div className="plants_list_container">

@@ -28,6 +28,7 @@ function PlantDetails() {
     const [waterings, setWaterings] = useState([])
     const [waterLeft, setWaterLeft] = useState(null)
     const [waitingFor, setWaitingFor] = useState(null)
+    const [loadError, setLoadError] = useState(false)
     const loadMoreRef = useRef(null)
 
     useEffect(() => {
@@ -41,7 +42,10 @@ function PlantDetails() {
                     fetchTreflePlantDetails(foundPlant.trefle_id).then(setTrefleData)
                 }
             })
-            .catch(() => setLoading(false))
+            .catch(() => {
+                setLoadError(true)
+                setLoading(false)
+            })
     }, [id])
 
     const loadMeasurements = () => {
@@ -159,7 +163,7 @@ function PlantDetails() {
         return (
             <div className="card">
                 <div className="empty_state">
-                    <p>Plant not found</p>
+                    <p>{loadError ? 'Cannot connect to server' : 'Plant not found'}</p>
                 </div>
             </div>
         )
