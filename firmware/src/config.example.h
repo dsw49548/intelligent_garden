@@ -1,25 +1,25 @@
 #pragma once
 
-// Skopiuj ten plik do src/config.h i uzupełnij dane WiFi.
-// src/config.h jest w .gitignore — nie commituj haseł.
+// Copy this file to src/config.h and fill in the WiFi settings.
+// src/config.h is in .gitignore, do not commit passwords.
 
 #define WIFI_SSID        "YOUR_WIFI_SSID"
 #define WIFI_PASSWORD    "YOUR_WIFI_PASSWORD"
-#define SERVER_HOST      "192.168.1.82"   // IP laptopa z `hostname -I`
+#define SERVER_HOST      "192.168.1.82"   // laptop IP from `hostname -I`
 #define SERVER_PORT      4567
-#define DEVICE_ID        "esp32-1"  // identyfikator urzadzenia, roslina wybierana w aplikacji
+#define DEVICE_ID        "esp32-1"        // the plant measured by this device is chosen in the app
 #define SEND_INTERVAL_MS 5000
 
+// Raw ADC readings mapped to 100% (wet) and 0% (dry) soil moisture
 #define SOIL_WET_RAW  1500
 #define SOIL_DRY_RAW  2400
 
-// Pompka przez przekaznik (modul JQC3F-05VDC-C, zworka H/L na H)
-#define PUMP_PIN         23     // GPIO -> wejscie IN przekaznika
-#define PUMP_ACTIVE_HIGH 1      // 1: HIGH = pompa pracuje, 0: LOW = pompa pracuje
-#define PUMP_MAX_RUN_MS  10000  // twardy limit pojedynczej pracy pompy [ms]
+// Pump through a relay (JQC3F-05VDC-C module, H/L jumper on H)
+#define PUMP_PIN         23     // GPIO -> relay IN
+#define PUMP_ACTIVE_HIGH 1      // 1: HIGH = pump on, 0: LOW = pump on
+#define PUMP_MAX_RUN_MS  10000  // hard limit of a single pump run [ms]
 
-// Podlewanie
-#define WATER_ML_PER_SEC     6      // wydajnosc pompy [ml/s]
-#define MAX_WATER_ML_PER_DAY 100    // lokalny limit wody na 24 h, niezalezny od serwera
-#define AUTO_MAX_TEMP_C      30     // auto podlewanie tylko gdy temp <= tej wartosci
-#define AUTO_MAX_LUX         20000  // auto podlewanie tylko gdy swiatlo <= tej wartosci (nie w pelnym sloncu)
+#define WATER_ML_PER_SEC     6      // pump flow [ml/s]
+#define MAX_WATER_ML_PER_DAY 100    // local 24 h water limit, independent of the server
+#define AUTO_MAX_TEMP_C      30     // no auto watering above this temperature
+#define AUTO_MAX_LUX         20000  // no auto watering in full sun

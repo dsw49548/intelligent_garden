@@ -12,11 +12,9 @@
 #define DHT_PIN  4
 #define SOIL_PIN 34
 
-// Log na Serial co 2 s, niezależnie od wysyłki (SEND_INTERVAL_MS z config.h)
 #define LOG_INTERVAL_MS      2000UL
-// Ponowna synchronizacja NTP nie częściej niż co 30 s
 #define NTP_RETRY_MS         30000UL
-// Czas uznajemy za poprawny dopiero po synchronizacji (2023-11-14)
+// Before NTP sync the clock starts at 1970; anything earlier than 2023-11-14 is not real time
 #define TIME_VALID_AFTER     1700000000L
 
 DHT dht(DHT_PIN, DHT22);
@@ -26,8 +24,6 @@ unsigned long lastSend = 0;
 unsigned long lastLog = 0;
 unsigned long lastNtpAttempt = 0;
 bool timeSynced = false;
-
-// ---------- Podlewanie: zmienne ----------
 
 #define MANUAL_MIN_GAP_MS 60000UL
 #define WATER_MIN_RUN_MS  500
@@ -39,7 +35,7 @@ enum WaterState { W_IDLE, W_PUMPING, W_SOAKING, W_REPORT };
 const char* waterStateNames[] = { "IDLE", "PUMPING", "SOAKING", "REPORT" };
 WaterState waterState = W_IDLE;
 
-// ostatni config z serwera (pole "device" w odpowiedzi na pomiar)
+// Last watering config from the server ("device" field in the measurement response)
 bool cfgReceived = false;
 bool cfgAuto = false;
 int cfgSoilTrigger = 30;
@@ -60,12 +56,11 @@ bool manualOnce = false;
 unsigned long lastManualMs = 0;
 unsigned long lastLimitLogMs = 0;
 
-// lokalna historia podlewan do limitu dobowego (0 ms = pusty wpis)
+// Local log of pump runs for the daily limit, independent of the server (0 ms = empty slot)
 unsigned long waterLogAt[WATER_LOG_SIZE];
 uint32_t waterLogMs[WATER_LOG_SIZE];
 int waterLogNext = 0;
 
-// biezace podlewanie
 String evStartedAt;
 const char* evTrigger = "auto";
 const char* evResult = "ok";
@@ -82,9 +77,8 @@ bool timeIsValid() {
   return time(nullptr) >= TIME_VALID_AFTER;
 }
 
-// Ostatnia linia obrony przed wywołaniem blokującym (WiFi, NTP, HTTP):
-// w trakcie blokady pumpUpdate() się nie wykona, więc pompa nie może pracować.
-// Normalnie loop() w ogóle nie dochodzi tu przy pracującej pompie.
+// WiFi, NTP and HTTP calls block for seconds and pumpUpdate() cannot run meanwhile,
+// so the pump is stopped before them (normally loop() never gets here while it runs).
 void stopPumpBeforeBlocking() {
   if (pumpIsRunning()) {
     pumpStop("siec");
@@ -121,8 +115,7 @@ void syncNTP() {
   Serial.println(timeSynced ? " OK" : " BLAD");
 }
 
-// Nieblokujące pilnowanie NTP: SNTP działa w tle, tu tylko sprawdzamy stan
-// i co NTP_RETRY_MS restartujemy klienta, jeśli czas wciąż jest niepoprawny.
+// SNTP runs in the background; this only restarts it every NTP_RETRY_MS while the time is invalid.
 void maintainNTP(unsigned long now) {
   if (timeIsValid()) {
     if (!timeSynced) {
@@ -132,8 +125,8 @@ void maintainNTP(unsigned long now) {
     return;
   }
   timeSynced = false;
-  if (pumpIsRunning() || pumpClicktestActive()) {
-    return;  // ponowienie NTP odkładamy do zatrzymania pompy
+  if (pumpIsRunning()) {
+    return;
   }
   if (WiFi.status() == WL_CONNECTED && now - lastNtpAttempt >= NTP_RETRY_MS) {
     lastNtpAttempt = now;
@@ -176,11 +169,6 @@ void readDeviceConfig(JsonObject d) {
 }
 
 void sendData(float temp, float hum, float lux, int soilPct) {
-  if (WiFi.status() != WL_CONNECTED) {
-    connectWiFi();
-    return;
-  }
-
   String url = String("http://") + SERVER_HOST + ":" + SERVER_PORT + "/api/measurements";
   String body = String("{\"device_id\":\"") + DEVICE_ID + "\"" +
     ",\"measured_at\":\"" + isoTime() + "\"" +
@@ -203,8 +191,6 @@ void sendData(float temp, float hum, float lux, int soilPct) {
   }
   http.end();
 }
-
-// ---------- Podlewanie: automat IDLE -> PUMPING -> SOAKING -> REPORT ----------
 
 uint32_t localUsedMs(unsigned long now) {
   uint32_t sum = 0;
@@ -279,9 +265,10 @@ bool sendWatering() {
   return code == 201;
 }
 
+// State machine IDLE -> PUMPING -> SOAKING -> REPORT, called after every sensor read
 void waterUpdate(unsigned long now, int soil, float temp, float lux) {
   if (waterState == W_IDLE) {
-    bool ready = cfgReceived && !localBlock && !cfgBlocked && !pumpIsRunning() && !pumpClicktestActive();
+    bool ready = cfgReceived && !localBlock && !cfgBlocked && !pumpIsRunning();
     if (waterNowPending) {
       waterNowPending = false;
       if (!ready) {
@@ -345,8 +332,6 @@ void waterUpdate(unsigned long now, int soil, float temp, float lux) {
   }
 }
 
-// ---------- Komendy testowe po Serialu ----------
-
 #define CMD_BUF_LEN 48
 char cmdBuf[CMD_BUF_LEN];
 size_t cmdLen = 0;
@@ -358,8 +343,7 @@ void cmdHelp() {
   Serial.println("  status      stan pompy, WiFi i czasu");
   Serial.printf ("  pump <ms>   start pompy na <ms> (%d..%lu), np. pump 2000\n",
                  PUMP_MIN_RUN_MS, (unsigned long)PUMP_MAX_RUN_MS);
-  Serial.println("  stop        natychmiastowe wylaczenie (przerywa tez clicktest)");
-  Serial.println("  clicktest   3 cykle 300 ms ON / 700 ms OFF (test przekaznika)");
+  Serial.println("  stop        natychmiastowe wylaczenie");
   Serial.println("  water       reczne podlanie (te same zasady i limity co z aplikacji)");
   Serial.println("  wstatus     stan podlewania, blokada, woda z 24 h, ostatni config");
 }
@@ -380,11 +364,8 @@ void cmdWaterStatus() {
 }
 
 void cmdStatus() {
-  Serial.printf("STATUS: pompa %s", pumpIsRunning() ? "ON" : "OFF");
-  if (pumpClicktestActive()) {
-    Serial.print(" (clicktest trwa)");
-  }
-  Serial.printf(", ostatnia praca %lu ms\n", (unsigned long)pumpLastRunMs());
+  Serial.printf("STATUS: pompa %s, ostatnia praca %lu ms\n",
+                pumpIsRunning() ? "ON" : "OFF", (unsigned long)pumpLastRunMs());
   Serial.printf("STATUS: PUMP_PIN=%d PUMP_ACTIVE_HIGH=%d PUMP_MAX_RUN_MS=%lu\n",
                 PUMP_PIN, PUMP_ACTIVE_HIGH, (unsigned long)PUMP_MAX_RUN_MS);
   if (WiFi.status() == WL_CONNECTED) {
@@ -407,15 +388,10 @@ void cmdPump(const char* arg) {
     Serial.println("Uzycie: pump <ms>, np. pump 2000");
     return;
   }
-  if (pumpClicktestActive()) {
-    Serial.println("PUMP: odrzucono, trwa clicktest (wpisz stop)");
-    return;
-  }
   pumpStart(ms);
 }
 
 void handleCommand(char* line) {
-  // Przytnij spacje z końca i z początku, zamień na małe litery
   size_t n = strlen(line);
   while (n > 0 && line[n - 1] == ' ') line[--n] = '\0';
   while (*line == ' ') line++;
@@ -431,8 +407,7 @@ void handleCommand(char* line) {
     cmdStatus();
   } else if (strcmp(line, "stop") == 0) {
     bool wasRunning = pumpIsRunning();
-    pumpClicktestAbort();
-    pumpStop("stop");  // wymusza pin na OFF także, gdy pompa już stoi
+    pumpStop("stop");
     if (!wasRunning) {
       Serial.println("PUMP: juz wylaczona");
     }
@@ -441,8 +416,6 @@ void handleCommand(char* line) {
     Serial.println("WATER: komenda water, start przy nastepnym odczycie");
   } else if (strcmp(line, "wstatus") == 0) {
     cmdWaterStatus();
-  } else if (strcmp(line, "clicktest") == 0) {
-    pumpClicktestStart();
   } else if (strcmp(line, "pump") == 0 || strncmp(line, "pump ", 5) == 0) {
     cmdPump(line + 4);
   } else {
@@ -450,7 +423,6 @@ void handleCommand(char* line) {
   }
 }
 
-// Nieblokujące czytanie znak po znaku; linia kończy się \n lub \r.
 void handleSerial() {
   while (Serial.available() > 0) {
     char c = (char)Serial.read();
@@ -477,7 +449,7 @@ void handleSerial() {
 }
 
 void setup() {
-  // Pierwsza rzecz po resecie: przekaźnik w stan nieaktywny (pompa stoi).
+  // First thing after reset: relay off.
   pumpBegin();
 
   Serial.begin(115200);
@@ -496,14 +468,14 @@ void setup() {
 
 void loop() {
   unsigned long now = millis();
-  pumpUpdate(now);  // w każdym przebiegu, przed wczesnym return
+  pumpUpdate(now);  // before the early return below
   handleSerial();
   maintainNTP(now);
 
   bool sendDue = now - lastSend >= SEND_INTERVAL_MS;
   bool logDue  = now - lastLog  >= LOG_INTERVAL_MS;
   if (!sendDue && !logDue) {
-    delay(1);  // oddaj CPU innym zadaniom (WiFi/lwIP, IDLE); max 1 ms opóźnienia
+    delay(1);  // let the WiFi/lwIP tasks run
     return;
   }
 
@@ -517,7 +489,7 @@ void loop() {
   for (int i = 0; i < numSamples; i++) {
     rawSum += analogRead(SOIL_PIN);
     delay(10);
-    pumpUpdate(millis());  // uśrednianie trwa ~200 ms; timer pompy nie może czekać
+    pumpUpdate(millis());  // averaging takes ~200 ms, the pump timer cannot wait that long
   }
 
   int raw = rawSum / numSamples;
@@ -536,18 +508,17 @@ void loop() {
   waterUpdate(now, soil, temp, lux);
 
   if (sendDue) {
-    // Stały rytm co SEND_INTERVAL_MS (bez dryfu o czas odczytu i POST).
-    // Po dłuższej blokadzie (np. reconnect WiFi) nie nadrabiamy zaległych wysyłek.
+    // Fixed rhythm without drift; after a long block (WiFi reconnect) missed sends are skipped.
     lastSend += SEND_INTERVAL_MS;
     if (now - lastSend >= SEND_INTERVAL_MS) {
       lastSend = now;
     }
 
-    if (pumpIsRunning() || pumpClicktestActive()) {
-      // connectWiFi/NTP/POST blokują na sekundy, a wtedy pumpUpdate() nie działa.
+    if (pumpIsRunning()) {
+      // No network while the pump runs: WiFi/NTP/POST block for seconds and pumpUpdate() would not run.
       Serial.println("POMIJAM wysylke: pompa pracuje");
     } else if (WiFi.status() != WL_CONNECTED) {
-      connectWiFi();  // jak wcześniej: pomiar przepada, reconnect do ~15 s
+      connectWiFi();
     } else if (isnan(temp) || isnan(hum)) {
       Serial.printf("POMIJAM wysylke: DHT22 zwrocil NaN (temp=%s, hum=%s)\n",
                     isnan(temp) ? "NaN" : "ok", isnan(hum) ? "NaN" : "ok");
