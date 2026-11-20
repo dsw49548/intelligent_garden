@@ -4,7 +4,7 @@ Intelligent Garden to projekt systemu monitorowania roślin z wykorzystaniem czu
 
 ### Jednorazowa konfiguracja
 
-Wymagania: Ruby z bundlerem, Node.js z npm, `adb` (Android platform-tools), PlatformIO (dla firmware).
+Wymagania: Ruby 3.2+ z bundlerem, Node.js z npm, `adb` (Android platform-tools), PlatformIO (dla firmware).
 
 ```bash
 # backend
@@ -126,8 +126,10 @@ Inne komendy: `mode <stable|daynight|dryout|randomwalk>`, `interval <s>`, `statu
 ## Struktura projektu
 
 - `backend/` - API Sinatra + SQLite + Fake IoT CLI generator (`fake_iot.rb`)
-  - Konta: `/api/register`, `/api/login`, `/api/logout`, `/api/me` (token w nagłówku `Authorization: Bearer <token>`)
-  - Rośliny (wymagają logowania): `/api/plants`, `/api/plants/:id`, `/api/plants/:id/measurements`
-  - Pomiary: `POST /api/measurements` (bez logowania, ESP32), `GET /api/measurements/latest`, `GET /api/measurements?plant_id=X&limit=Y` (wymagają logowania)
+  - Konta: `/api/register`, `/api/login`, `/api/logout` (token w nagłówku `Authorization: Bearer <token>`)
+  - Rośliny (wymagają logowania): `/api/plants`, `/api/plants/:id`, `/api/plants/:id/measurements`, `/api/plants/:id/stats`
+  - Podlewanie (wymaga logowania): `/api/plants/:id/water`, `/api/plants/:id/unblock`, `/api/plants/:id/waterings`
+  - ESP32 (bez logowania): `POST /api/measurements` (`device_id`, Fake IoT: `plant_id`), `POST /api/waterings`
+  - Pomiary (wymagają logowania): `GET /api/measurements/latest`, `GET /api/measurements?plant_id=X&limit=Y`
   - Trefle proxy (wymaga logowania): `/api/trefle/search?q=QUERY`, `/api/trefle/:id`, `/api/trefle/:id/recommendations`
 - `frontend/` - React PWA (Vite + React Router + Chart.js)

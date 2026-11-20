@@ -2,7 +2,7 @@
 
 ## Wymagania
 
-- Ruby 3.4+
+- Ruby 3.2+
 - Bundler
 
 ## Instalacja
@@ -30,9 +30,8 @@ Endpointy oznaczone (auth) wymagają nagłówka `Authorization: Bearer <token>`,
 | POST | `/api/register` | `{username, password}` → `{token, user}`; 400 złe dane, 409 zajęta nazwa |
 | POST | `/api/login` | `{username, password}` → `{token, user}`; 401 złe dane |
 | POST | `/api/logout` | (auth) usuwa token |
-| GET | `/api/me` | (auth) zalogowany użytkownik |
 | GET, POST | `/api/plants` | (auth) lista / dodanie rośliny |
-| GET, PUT, DELETE | `/api/plants/:id` | (auth) roślina; PUT przyjmuje też `device_id` (string/null) i ustawienia podlewania; DELETE usuwa też jej pomiary; cudza roślina → 404 |
+| GET, PUT, DELETE | `/api/plants/:id` | (auth) roślina; PUT przyjmuje też `device_id` (string/null) i ustawienia podlewania; DELETE usuwa też jej pomiary i podlewania; cudza roślina → 404 |
 | DELETE | `/api/plants/:id/measurements` | (auth) czyści pomiary rośliny |
 | POST | `/api/plants/:id/water` | (auth) podlej teraz → 202; 409 gdy blokada, limit dobowy albo brak czujnika |
 | POST | `/api/plants/:id/unblock` | (auth) zdejmuje blokadę podlewania |
@@ -46,7 +45,7 @@ Endpointy oznaczone (auth) wymagają nagłówka `Authorization: Bearer <token>`,
 | GET | `/api/trefle/:id` | (auth) szczegóły rośliny z Trefle |
 | GET | `/api/trefle/:id/recommendations` | (auth) progi wyliczone z danych Trefle (`main_species.growth`) |
 
-Statystyki dzienne (`daily`) liczone są dla dni w UTC.
+Statystyki dzienne (`daily`) liczone są dla dni w UTC. Limit wody: 200 ml na 24 h na roślinę (pompa 6 ml/s). Puste body albo niepoprawny JSON → 400.
 
 Roślina demo z symulowanymi danymi z 7 dni: `bundle exec ruby seed_demo.rb <username>`.
 
