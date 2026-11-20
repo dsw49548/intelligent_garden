@@ -1,16 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Line } from 'react-chartjs-2'
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
-import { calculateStatus } from '../storage.js'
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
+import { calculateStatus, STATUS_EMOJI } from '../storage.js'
 import { getPlant, deletePlant, fetchLatestMeasurement, fetchMeasurements, fetchTreflePlantDetails, waterPlant, unblockPlant, getWaterings } from '../api.js'
-import { deletePhoto } from '../storage_photos.js'
-import { loadPlantPhoto } from '../utils/photo_loader.js'
+import { deletePhoto, loadPlantPhoto } from '../storage_photos.js'
 import { useApp } from '../contexts/app_context.jsx'
 import BottomSheet from '../components/bottom_sheet.jsx'
 import PlantSettings from '../components/plant_settings.jsx'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
 const WATER_ML_PER_SEC = 6
 
@@ -166,13 +165,6 @@ function PlantDetails() {
         )
     }
 
-    const statusEmoji = {
-        'OK': '🟢',
-        'WARN': '🟡',
-        'BAD': '🔴',
-        'NO DATA': '⚪'
-    }
-
     const status = calculateStatus(measurement, plant)
     const statusClass = status === 'NO DATA' ? 'status_nodata' : `status_${status.toLowerCase()}`
     const commonName = plant.name
@@ -203,7 +195,6 @@ function PlantDetails() {
                     usePointStyle: true,
                 }
             },
-            title: { display: false }
         },
         scales: {
             x: {
@@ -294,7 +285,7 @@ function PlantDetails() {
                     <div className="latest_header_row">
                         <h3 className="card_title" style={{ margin: 0 }}>Latest measurement</h3>
                         <span className={`status_badge ${statusClass}`}>
-                            {statusEmoji[status]} {status}
+                            {STATUS_EMOJI[status]} {status}
                         </span>
                     </div>
                     {lastUpdated && (

@@ -7,27 +7,20 @@ const HORIZONTAL_RATIO = 1.5
 
 function Drawer({ isOpen, onClose, onOpen }) {
     const drawerRef = useRef(null)
-    const overlayRef = useRef(null)
     const touchStartRef = useRef(null)
-    const touchStartXRef = useRef(null)
-    const touchStartYRef = useRef(null)
-    const isHorizontalSwipeRef = useRef(false)
 
     useEffect(() => {
         const handleTouchStart = (e) => {
             const touch = e.touches[0]
             touchStartRef.current = { x: touch.clientX, y: touch.clientY }
-            touchStartXRef.current = touch.clientX
-            touchStartYRef.current = touch.clientY
-            isHorizontalSwipeRef.current = false
         }
 
         const handleTouchMove = (e) => {
             if (!touchStartRef.current) return
 
             const touch = e.touches[0]
-            const deltaX = touch.clientX - touchStartXRef.current
-            const deltaY = touch.clientY - touchStartYRef.current
+            const deltaX = touch.clientX - touchStartRef.current.x
+            const deltaY = touch.clientY - touchStartRef.current.y
             const absDeltaX = Math.abs(deltaX)
             const absDeltaY = Math.abs(deltaY)
 
@@ -35,7 +28,6 @@ function Drawer({ isOpen, onClose, onOpen }) {
                 const isHorizontal = absDeltaX > absDeltaY * HORIZONTAL_RATIO
 
                 if (isHorizontal) {
-                    isHorizontalSwipeRef.current = true
                     e.preventDefault()
 
                     if (isOpen && deltaX < 0) {
@@ -44,8 +36,6 @@ function Drawer({ isOpen, onClose, onOpen }) {
                             drawerRef.current.style.transform = `translateX(${translateX}px)`
                         }
                     }
-                } else {
-                    isHorizontalSwipeRef.current = false
                 }
             }
         }
@@ -54,8 +44,8 @@ function Drawer({ isOpen, onClose, onOpen }) {
             if (!touchStartRef.current) return
 
             const touch = e.changedTouches[0]
-            const deltaX = touch.clientX - touchStartXRef.current
-            const deltaY = touch.clientY - touchStartYRef.current
+            const deltaX = touch.clientX - touchStartRef.current.x
+            const deltaY = touch.clientY - touchStartRef.current.y
             const absDeltaX = Math.abs(deltaX)
             const absDeltaY = Math.abs(deltaY)
 
@@ -74,9 +64,6 @@ function Drawer({ isOpen, onClose, onOpen }) {
             }
 
             touchStartRef.current = null
-            touchStartXRef.current = null
-            touchStartYRef.current = null
-            isHorizontalSwipeRef.current = false
         }
 
         document.addEventListener('touchstart', handleTouchStart, { passive: false })
@@ -97,16 +84,7 @@ function Drawer({ isOpen, onClose, onOpen }) {
 
     return (
         <>
-            <div
-                ref={overlayRef}
-                className="drawer_overlay"
-                onClick={onClose}
-                onTouchStart={(e) => {
-                    if (e.target === overlayRef.current) {
-                        onClose()
-                    }
-                }}
-            ></div>
+            <div className="drawer_overlay" onClick={onClose}></div>
             <div
                 ref={drawerRef}
                 className={`drawer ${isOpen ? 'drawer_open' : ''}`}

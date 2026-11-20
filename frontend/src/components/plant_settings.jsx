@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { updatePlant, clearPlantMeasurements } from '../api.js'
 import { savePhoto, deletePhoto, compressImage } from '../storage_photos.js'
 import { useApp } from '../contexts/app_context.jsx'
+import { THRESHOLD_RANGES } from '../storage.js'
 
 const THRESHOLD_KEYS = ['soil_min', 'soil_max', 'temp_min', 'temp_max', 'hum_min', 'hum_max', 'light_min', 'light_max']
 const DEVICE_ID = 'esp32-1'
@@ -24,7 +25,7 @@ function PlantSettings({ plant, onSave, onDelete, onCleared, onClose, onPhotoCha
     const fileInputRef = useRef(null)
 
     const validateThreshold = (key, min, max) => {
-        const range = getRange(key)
+        const range = THRESHOLD_RANGES[key]
 
         if (min >= max) {
             return `${key}: min must be less than max`
@@ -48,7 +49,7 @@ function PlantSettings({ plant, onSave, onDelete, onCleared, onClose, onPhotoCha
             const maxKey = `${key}_max`
             const currentMin = prevThresholds[minKey]
             const currentMax = prevThresholds[maxKey]
-            const range = getRange(key)
+            const range = THRESHOLD_RANGES[key]
 
             if (type === 'min') {
                 const clampedValue = Math.max(range.min, Math.min(numValue, currentMax - 1))
@@ -146,22 +147,12 @@ function PlantSettings({ plant, onSave, onDelete, onCleared, onClose, onPhotoCha
         onPhotoChange()
     }
 
-    const getRange = (key) => {
-        const ranges = {
-            soil: { min: 0, max: 100 },
-            temp: { min: -10, max: 50 },
-            hum: { min: 0, max: 100 },
-            light: { min: 0, max: 20000 }
-        }
-        return ranges[key] || { min: 0, max: 100 }
-    }
-
     const renderThreshold = (key, label, unit = '') => {
         const minKey = `${key}_min`
         const maxKey = `${key}_max`
         const min = thresholds[minKey]
         const max = thresholds[maxKey]
-        const range = getRange(key)
+        const range = THRESHOLD_RANGES[key]
 
         return (
             <div className="threshold_group" key={key}>

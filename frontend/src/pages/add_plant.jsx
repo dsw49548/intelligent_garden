@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getDefaultThresholds } from '../storage.js'
+import { getDefaultThresholds, THRESHOLD_RANGES } from '../storage.js'
 import { createPlant, searchTreflePlants, getTrefleRecommendations } from '../api.js'
 import { savePhoto, deletePhoto, compressImage } from '../storage_photos.js'
 
@@ -9,7 +9,6 @@ function AddPlant() {
     const [query, setQuery] = useState('')
     const [name, setName] = useState('')
     const [photo, setPhoto] = useState(null)
-    const [photoFile, setPhotoFile] = useState(null)
     const [photoFileName, setPhotoFileName] = useState(null)
     const [searchResults, setSearchResults] = useState([])
     const [selectedTrefle, setSelectedTrefle] = useState(null)
@@ -91,16 +90,6 @@ function AddPlant() {
         }
     }
 
-    const getRange = (key) => {
-        const ranges = {
-            soil: { min: 0, max: 100 },
-            temp: { min: -10, max: 50 },
-            hum: { min: 0, max: 100 },
-            light: { min: 0, max: 20000 }
-        }
-        return ranges[key] || { min: 0, max: 100 }
-    }
-
     const handleThresholdChange = (key, type, value) => {
         const numValue = parseFloat(value)
         if (isNaN(numValue)) return
@@ -113,7 +102,7 @@ function AddPlant() {
             const maxKey = `${key}_max`
             const currentMin = baseThresholds[minKey] ?? defaults[minKey]
             const currentMax = baseThresholds[maxKey] ?? defaults[maxKey]
-            const range = getRange(key)
+            const range = THRESHOLD_RANGES[key]
 
             if (type === 'min') {
                 const clampedValue = Math.max(range.min, Math.min(numValue, currentMax - 1))
@@ -133,7 +122,6 @@ function AddPlant() {
             if (file.size > maxSize) {
                 setSubmitError('Photo is too large. Maximum size is 5 MB.')
                 setPhoto(null)
-                setPhotoFile(null)
                 setPhotoFileName(null)
                 if (fileInputRef.current) {
                     fileInputRef.current.value = ''
@@ -142,7 +130,6 @@ function AddPlant() {
             }
 
             setPhotoFileName(file.name)
-            setPhotoFile(file)
             setSubmitError(null)
 
             try {
@@ -151,7 +138,6 @@ function AddPlant() {
             } catch (err) {
                 setSubmitError(err.message || 'Failed to process photo')
                 setPhoto(null)
-                setPhotoFile(null)
                 setPhotoFileName(null)
                 if (fileInputRef.current) {
                     fileInputRef.current.value = ''
@@ -162,7 +148,6 @@ function AddPlant() {
 
     const handleRemovePhoto = () => {
         setPhoto(null)
-        setPhotoFile(null)
         setPhotoFileName(null)
         setSubmitError(null)
         if (fileInputRef.current) {
@@ -220,7 +205,7 @@ function AddPlant() {
         const defaults = getDefaultThresholds()
         const min = thresholds?.[minKey] ?? defaults[minKey]
         const max = thresholds?.[maxKey] ?? defaults[maxKey]
-        const range = getRange(key)
+        const range = THRESHOLD_RANGES[key]
 
         return (
             <div className="threshold_group" key={key}>

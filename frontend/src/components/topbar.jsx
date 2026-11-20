@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import Drawer from './drawer.jsx'
 import { getToken } from '../storage.js'
 
-function Topbar({ onMenuClick }) {
+function Topbar() {
     const [drawerOpen, setDrawerOpen] = useState(false)
 
     const handleMenuClick = () => {

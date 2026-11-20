@@ -40,6 +40,10 @@ export async function savePhoto(plantId, dataUrl) {
   }
 }
 
+export async function loadPlantPhoto(plant) {
+    return (await getPhoto(plant.id)) || plant.image_url || null
+}
+
 export async function getPhoto(plantId) {
   try {
     const db = await openDB()

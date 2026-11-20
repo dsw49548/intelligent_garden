@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { calculateStatus } from '../storage.js'
+import { calculateStatus, STATUS_EMOJI } from '../storage.js'
 import { getPlants, fetchLatestMeasurement } from '../api.js'
-import { loadPlantPhoto } from '../utils/photo_loader.js'
+import { loadPlantPhoto } from '../storage_photos.js'
 
 function Plants() {
     const [plants, setPlants] = useState([])
@@ -38,22 +38,11 @@ function Plants() {
         loadPhotos()
     }, [plants])
 
-    const getPlantStatus = (plant) => {
-        const status = calculateStatus(latestById[plant.id], plant)
-        const emojiMap = {
-            'OK': '🟢',
-            'WARN': '🟡',
-            'BAD': '🔴',
-            'NO DATA': '⚪'
-        }
-        return { status, emoji: emojiMap[status] }
-    }
-
     return (
         <div className="plants_list_container">
             {plants.map(plant => {
-                const statusInfo = getPlantStatus(plant)
-                const statusClass = statusInfo.status === 'NO DATA' ? 'status_nodata' : `status_${statusInfo.status.toLowerCase()}`
+                const status = calculateStatus(latestById[plant.id], plant)
+                const statusClass = status === 'NO DATA' ? 'status_nodata' : `status_${status.toLowerCase()}`
                 const latest = latestById[plant.id]
                 const photoUrl = plantPhotos[plant.id]
                 return (
@@ -71,7 +60,7 @@ function Plants() {
                             <div className="plant_tile_title_row">
                                 <h3>{plant.name}</h3>
                                 <span className={`status_badge ${statusClass}`}>
-                                    {statusInfo.emoji} {statusInfo.status}
+                                    {STATUS_EMOJI[status]} {status}
                                 </span>
                             </div>
                         </div>

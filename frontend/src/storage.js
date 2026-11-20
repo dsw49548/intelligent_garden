@@ -19,6 +19,13 @@ export function clearAuth() {
   }
 }
 
+export const THRESHOLD_RANGES = {
+  soil: { min: 0, max: 100 },
+  temp: { min: -10, max: 50 },
+  hum: { min: 0, max: 100 },
+  light: { min: 0, max: 20000 }
+}
+
 export function getDefaultThresholds() {
   return {
     soil_min: 30,
@@ -32,10 +39,11 @@ export function getDefaultThresholds() {
   }
 }
 
-export function calculateStatus(measurement, plant) {
+export const STATUS_EMOJI = { 'OK': '🟢', 'WARN': '🟡', 'BAD': '🔴', 'NO DATA': '⚪' }
+
+export function calculateStatus(measurement, th) {
   if (!measurement) return 'NO DATA'
 
-  const th = plant || getDefaultThresholds()
   let outOfRange = 0
 
   if (measurement.soil_moisture < th.soil_min || measurement.soil_moisture > th.soil_max) {
