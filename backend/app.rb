@@ -101,7 +101,7 @@ DB.create_table? :waterings do
 end
 
 WATER_ML_PER_SEC = 6
-MAX_WATER_ML_PER_DAY = 100
+MAX_WATER_ML_PER_DAY = 200
 
 WATERING_RANGES = {
   'soil_trigger' => 0..100,

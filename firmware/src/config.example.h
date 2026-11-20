@@ -20,6 +20,6 @@
 #define PUMP_MAX_RUN_MS  10000  // hard limit of a single pump run [ms]
 
 #define WATER_ML_PER_SEC     6      // pump flow [ml/s]
-#define MAX_WATER_ML_PER_DAY 100    // local 24 h water limit, independent of the server
+#define MAX_WATER_ML_PER_DAY 200    // local 24 h water limit, independent of the server
 #define AUTO_MAX_TEMP_C      30     // no auto watering above this temperature
 #define AUTO_MAX_LUX         20000  // no auto watering in full sun
