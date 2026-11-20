@@ -4,15 +4,8 @@ frontend/node_modules/
 backend/vendor/
 
 # Build outputs
-# Ignore specific files/dirs in frontend/dist, but keep PWA files
-frontend/dist/assets/
-frontend/dist/index.html
-frontend/dist/*.css
-# Ignore JS files except PWA files
-frontend/dist/*.js
-!frontend/dist/sw.js
-!frontend/dist/registerSW.js
-!frontend/dist/workbox-*.js
+frontend/dist/
+frontend/dev-dist/
 *.log
 *.png
 !frontend/public/*.png
@@ -85,9 +78,6 @@ tmp/
 temp/
 *.tmp
 *.temp
-
-# PWA / Service Worker
-# Note: manifest.webmanifest, sw.js, registerSW.js, workbox-*.js are committed
 
 # Cache
 .cache/
