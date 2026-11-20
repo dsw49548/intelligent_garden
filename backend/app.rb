@@ -8,7 +8,7 @@ require 'cgi'
 require 'bcrypt'
 require 'securerandom'
 require 'webrick'
-require_relative 'lib/trefle_client'
+require 'open3'
 
 use Rack::Cors do
   allow do
@@ -26,12 +26,7 @@ disable :method_override
 DB_PATH = ENV['DB_PATH'] || File.expand_path(File.join(__dir__, "db.sqlite3"))
 DB = Sequel.connect("sqlite://#{DB_PATH}")
 
-begin
-  DB.run("PRAGMA journal_mode=WAL")
-rescue => e
-  puts "#{e.class} #{e.message}"
-  exit 1
-end
+DB.run("PRAGMA journal_mode=WAL")
 
 DB.create_table? :measurements do
   primary_key :id
@@ -116,7 +111,7 @@ WATERING_RANGES = {
   'min_rise' => 1..50
 }
 
-THRESHOLD_KEYS =%w[soil_min soil_max temp_min temp_max hum_min hum_max light_min light_max]
+THRESHOLD_KEYS = %w[soil_min soil_max temp_min temp_max hum_min hum_max light_min light_max]
 
 DEFAULT_THRESHOLDS = {
   'soil_min' => 30, 'soil_max' => 70,
@@ -125,7 +120,7 @@ DEFAULT_THRESHOLDS = {
   'light_min' => 500, 'light_max' => 5000
 }
 
-# POST/PUT bez Content-Length (np. curl -X POST bez -d): WEBrick rzuca wyjatek przy czytaniu body
+# WEBrick raises this when a POST/PUT has no Content-Length (e.g. curl -X POST without -d)
 error WEBrick::HTTPStatus::LengthRequired do
   content_type :json
   status 400
@@ -242,51 +237,45 @@ def device_config(plant, water_now)
 end
 
 def validate_measurement(data)
-  required_fields = %w[measured_at soil_moisture air_temp_c air_humidity light_lux]
-  required_fields.each do |field|
-    unless data.key?(field)
-      return { error: "missing field: #{field}" }
-    end
+  %w[measured_at soil_moisture air_temp_c air_humidity light_lux].each do |field|
+    error!(400, "missing field: #{field}") unless data.key?(field)
   end
 
   if data.key?('device_id')
-    return { error: 'invalid field: device_id' } unless data['device_id'].is_a?(String) && !data['device_id'].empty?
+    error!(400, 'invalid field: device_id') unless data['device_id'].is_a?(String) && !data['device_id'].empty?
   elsif !data.key?('plant_id')
-    return { error: 'missing field: plant_id or device_id' }
+    error!(400, 'missing field: plant_id or device_id')
   elsif !(data['plant_id'].is_a?(Integer) && data['plant_id'] > 0)
-    return { error: 'invalid field: plant_id' }
+    error!(400, 'invalid field: plant_id')
   end
 
   begin
     Time.iso8601(data['measured_at'])
   rescue
-    return { error: 'invalid field: measured_at' }
+    error!(400, 'invalid field: measured_at')
   end
 
-  unless data['soil_moisture'].is_a?(Integer) && data['soil_moisture'] >= 0 && data['soil_moisture'] <= 100
-    return { error: 'out of range: soil_moisture' }
-  end
-
-  unless (data['air_temp_c'].is_a?(Numeric))
-    return { error: 'invalid field: air_temp_c' }
-  end
-
-  unless (data['air_humidity'].is_a?(Numeric)) && data['air_humidity'] >= 0 && data['air_humidity'] <= 100
-    return { error: 'out of range: air_humidity' }
-  end
-
-  unless data['light_lux'].is_a?(Integer) && data['light_lux'] >= 0
-    return { error: 'out of range: light_lux' }
-  end
-
-  nil
+  error!(400, 'out of range: soil_moisture') unless data['soil_moisture'].is_a?(Integer) && data['soil_moisture'].between?(0, 100)
+  error!(400, 'invalid field: air_temp_c') unless data['air_temp_c'].is_a?(Numeric)
+  error!(400, 'out of range: air_humidity') unless data['air_humidity'].is_a?(Numeric) && data['air_humidity'].between?(0, 100)
+  error!(400, 'out of range: light_lux') unless data['light_lux'].is_a?(Integer) && data['light_lux'] >= 0
 end
 
 TREFLE_TOKEN = ENV['TREFLE_TOKEN']
 
 def fetch_trefle(path)
   error!(500, 'TREFLE_TOKEN is missing') unless TREFLE_TOKEN && !TREFLE_TOKEN.empty?
-  TrefleClient.fetch(path, TREFLE_TOKEN)
+  separator = path.include?('?') ? '&' : '?'
+  url = "https://trefle.io/api/v1#{path}#{separator}token=#{CGI.escape(TREFLE_TOKEN)}"
+  stdout, stderr, status = Open3.capture3('curl', '-sS', '--fail', '--compressed', url)
+  unless status.success?
+    puts "Trefle curl error: #{stderr}" unless stderr.empty?
+    return nil
+  end
+  JSON.parse(stdout)
+rescue JSON::ParserError => e
+  puts "Trefle JSON parse error: #{e.message}"
+  nil
 end
 
 def extract_native_to(data)
@@ -405,10 +394,6 @@ post '/api/logout' do
   { status: 'ok' }.to_json
 end
 
-get '/api/me' do
-  { id: current_user[:id], username: current_user[:username] }.to_json
-end
-
 get '/api/plants' do
   DB[:plants].where(user_id: current_user[:id]).order(:id).all.to_json
 end
@@ -484,7 +469,7 @@ end
 
 STAT_COLUMNS = { 'soil' => 'soil_moisture', 'temp' => 'air_temp_c', 'hum' => 'air_humidity', 'light' => 'light_lux' }
 
-# hours: srednie godzinowe gleby [{hour:, soil:}]; wzrosty (podlanie) i dziury w danych pomijamy
+# hours: hourly soil averages; rises (watering) and gaps between hours are skipped
 def drying_rate(hours)
   drops = []
   hours.each_cons(2) do |a, b|
@@ -551,50 +536,38 @@ end
 get '/api/trefle/search' do
   current_user
   query = params['q']
-  unless query && query.length >= 2
-    status 400
-    return { error: 'query too short (min 2 chars)' }.to_json
-  end
+  error!(400, 'query too short (min 2 chars)') unless query && query.length >= 2
 
   result = fetch_trefle("/plants/search?q=#{CGI.escape(query)}&limit=100")
+  error!(404, 'not found') unless result && result['data']
 
-  if result && result['data']
-    q = query.downcase.strip
-    plants = result['data'].first(100).map do |plant|
-      {
-        id: plant['id'],
-        scientific_name: plant['scientific_name'],
-        common_name: plant['common_name'],
-        family: plant['family'],
-        family_common_name: plant['family_common_name'],
-        genus: plant['genus'],
-        image_url: plant['image_url'],
-        slug: plant['slug']
-      }
-    end
-    plants.select! do |p|
-      (p[:common_name] || '').downcase.include?(q) || (p[:scientific_name] || '').downcase.include?(q)
-    end
-    plants.sort_by! do |p|
-      cn = (p[:common_name] || '').downcase
-      sn = (p[:scientific_name] || '').downcase
-      if cn.start_with?(q)
-        [0, cn]
-      elsif sn.start_with?(q)
-        [1, sn]
-      elsif cn.include?(q)
-        [2, cn]
-      elsif sn.include?(q)
-        [3, sn]
-      else
-        [4, cn]
-      end
-    end
-    { data: plants.first(15) }.to_json
-  else
-    status 404
-    { error: 'not found' }.to_json
+  q = query.downcase.strip
+  plants = result['data'].map do |plant|
+    {
+      id: plant['id'],
+      scientific_name: plant['scientific_name'],
+      common_name: plant['common_name'],
+      family: plant['family'],
+      image_url: plant['image_url']
+    }
   end
+  plants.select! do |p|
+    (p[:common_name] || '').downcase.include?(q) || (p[:scientific_name] || '').downcase.include?(q)
+  end
+  plants.sort_by! do |p|
+    cn = (p[:common_name] || '').downcase
+    sn = (p[:scientific_name] || '').downcase
+    if cn.start_with?(q)
+      [0, cn]
+    elsif sn.start_with?(q)
+      [1, sn]
+    elsif cn.include?(q)
+      [2, cn]
+    else
+      [3, sn]
+    end
+  end
+  { data: plants.first(15) }.to_json
 end
 
 get '/api/trefle/:id' do
@@ -614,11 +587,7 @@ end
 post '/api/measurements' do
   data = json_body
 
-  validation_error = validate_measurement(data)
-  if validation_error
-    status 400
-    return validation_error.to_json
-  end
+  validate_measurement(data)
 
   if data['device_id']
     plant = DB[:plants].where(device_id: data['device_id']).first
@@ -693,10 +662,7 @@ get '/api/measurements' do
   plant = find_plant(params['plant_id'])
 
   limit = params['limit'] ? params['limit'].to_i : 100
-  if limit < 1 || limit > 500
-    status 400
-    return { error: 'limit out of range (1-500)' }.to_json
-  end
+  error!(400, 'limit out of range (1-500)') unless limit.between?(1, 500)
 
   DB[:measurements]
     .where(plant_id: plant[:id])

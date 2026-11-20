@@ -1,5 +1,3 @@
-# Roslina demo z symulowanymi pomiarami z 7 dni (co 10 min), do ekranu statystyk.
-# Uzycie: bundle exec ruby seed_demo.rb <username>   (baza z DB_PATH, jak w app.rb)
 require_relative 'app'
 
 DEMO_NAME = 'Demo plant (simulated data)'
@@ -18,9 +16,9 @@ waterings = []
 
 while t <= end_time
   local = t.getlocal
-  sun = sun_by_day[local.yday] ||= 0.25 + rng.rand * 0.75     # pochmurny 0.25 .. sloneczny 1.0
+  sun = sun_by_day[local.yday] ||= 0.25 + rng.rand * 0.75     # 0.25 cloudy .. 1.0 sunny
   hour = local.hour + local.min / 60.0
-  daylight = [Math.sin((hour - 6) / 12.0 * Math::PI), 0].max   # dzien 6:00-18:00
+  daylight = [Math.sin((hour - 6) / 12.0 * Math::PI), 0].max   # day from 6:00 to 18:00
 
   light = (daylight * sun * 5000 + rng.rand * 5).round
   temp = 19 + 6 * daylight * sun + rng.rand * 2
